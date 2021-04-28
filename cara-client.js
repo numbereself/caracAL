@@ -69,6 +69,7 @@ async function make_runner(upper,CODE_file,version) {
   upper.caracAL.load_scripts = async function(locations) {
     return await ev_files(locations.map(x=>"./CODE/"+x),runner_context);
   }
+  vm.runInContext("active = true;parent.code_active = true;set_message('Code Active');if (character.rip) character.trigger('death', {past: true});", runner_context);
   process.send({type: "connected"});
   console.log("runner instance constructed");
   await ev_files([CODE_file],runner_context);
