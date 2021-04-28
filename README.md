@@ -22,6 +22,8 @@ git clone https://github.com/numbereself/caracAL.git
 cd caracAL
 #use npm to download dependencies
 npm install
+#if you want caracAL to autostart run
+#./start_on_boot.sh
 #run caracAL
 node main.js
 ```
