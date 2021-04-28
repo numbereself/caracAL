@@ -5,6 +5,5 @@
 .idea/
 /package-lock.json
 /CODE/*
-!/CODE/cm_test.js
 !/CODE/example.js
-!/CODE/deploy_test.js
+!/CODE/tests/

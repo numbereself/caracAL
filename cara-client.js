@@ -24,6 +24,9 @@ const html_spoof = `<!DOCTYPE html>
 function make_context(upper = null) {
   const result = new JSDOM(html_spoof,
     {url: "https://adventure.land/"}).window;
+  //jsdom maked globalThis point to Node global
+  //but we want it to be window instead
+  result.globalThis = result;
   result.fetch = fetch;
   result.$ = result.jQuery = node_query(result);
   result.require = require;
@@ -33,9 +36,8 @@ function make_context(upper = null) {
   vm.createContext(result);
 
   result.eval = function(arg) {
-    return vm.runInContext(arg, result)
+    return vm.runInContext(arg, result);
   };
-
   
   return result;
 }
@@ -62,6 +64,10 @@ async function make_runner(upper,CODE_file,version) {
       to,
       data
     });
+  }
+  //we need to do this here because of scoping
+  upper.caracAL.load_scripts = async function(locations) {
+    return await ev_files(locations.map(x=>"./CODE/"+x),runner_context);
   }
   process.send({type: "connected"});
   console.log("runner instance constructed");
@@ -107,12 +113,6 @@ async function make_game(version,addr,port,sess,cid,script_file) {
       type: "shutdown"
     });
   }
-
-  extensions.load_scripts = async function(locations) {
-    if(extensions.runner) {
-      return await ev_files(locations,extensions.runner);
-    }
-  }
   
   game_context.caracAL = extensions;
   
@@ -123,7 +123,6 @@ async function make_game(version,addr,port,sess,cid,script_file) {
     (async function() {
       const runner_context = await make_runner(game_context,"./CODE/"+script_file,version);
       extensions.runner = runner_context;
-      
     })();
   }
   const old_dc = game_context.disconnect;
