@@ -2,6 +2,7 @@
 /config.js
 /node_modules/
 /game_files/*
+!/game_files/README.md
 .idea/
 /package-lock.json
 /CODE/*
