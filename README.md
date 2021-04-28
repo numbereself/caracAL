@@ -23,6 +23,7 @@ cd caracAL
 #use npm to download dependencies
 npm install
 #if you want caracAL to autostart run
+#chmod +x ./start_on_boot.sh
 #./start_on_boot.sh
 #run caracAL
 node main.js
