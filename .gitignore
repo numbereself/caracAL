@@ -1,0 +1,10 @@
+/caracAL.log*
+/config.js
+/node_modules/
+/game_files/*
+.idea/
+/package-lock.json
+/CODE/*
+!/CODE/cm_test.js
+!/CODE/example.js
+!/CODE/deploy_test.js

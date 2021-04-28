@@ -1,0 +1,17 @@
+[Unit]
+Description=caracAL - Node client for adventure.land
+Documentation=https://github.com/numbereself/caracAL
+After=network.target
+
+[Service]
+Environment=CARACAL_SERVICE=OHYEAH
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/caracAL
+ExecStart=/usr/bin/node main.js
+Restart=always
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target

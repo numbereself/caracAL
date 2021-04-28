@@ -1,0 +1,19 @@
+{
+  "name": "caracal",
+  "version": "0.0.1",
+  "description": "caracAL - Node client for adventure.land",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "number_e",
+  "license": "MIT",
+  "dependencies": {
+    "inquirer": "^8.0.0",
+    "jquery": "^3.6.0",
+    "jsdom": "^16.5.3",
+    "logrotate-stream": "^0.2.8",
+    "node-fetch": "^2.6.1",
+    "socket.io-client": "2.3.0"
+  }
+}
