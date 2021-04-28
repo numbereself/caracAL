@@ -8,7 +8,7 @@ Environment=CARACAL_SERVICE=OHYEAH
 Type=simple
 User=pi
 WorkingDirectory=/home/pi/caracAL
-ExecStart=node main.js
+ExecStart=/home/pi/.nvm/versions/node/v14.16.1/bin/node main.js
 Restart=always
 StandardOutput=null
 StandardError=null
