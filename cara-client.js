@@ -5,6 +5,7 @@ const fs = require('fs').promises;
 const { JSDOM } = require( "jsdom" );
 const node_query = require('jquery');
 const game_files = require("./game_files");
+const fetch = require('node-fetch');
 
 process.on('unhandledRejection', function (exception) {
   console.warn("promise rejected: \n",exception);
@@ -23,6 +24,7 @@ const html_spoof = `<!DOCTYPE html>
 function make_context(upper = null) {
   const result = new JSDOM(html_spoof,
     {url: "https://adventure.land/"}).window;
+  result.fetch = fetch;
   result.$ = result.jQuery = node_query(result);
   result.require = require;
   if(upper) {
@@ -33,6 +35,8 @@ function make_context(upper = null) {
   result.eval = function(arg) {
     return vm.runInContext(arg, result)
   };
+
+  
   return result;
 }
 

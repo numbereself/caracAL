@@ -4,8 +4,6 @@ const game_files = require("./game_files");
 const log_rotor = require('logrotate-stream');
 const log_stream = log_rotor({ file: './caracAL.log', size: 1500000, keep: 3 });
 const cara_cfg = require("./cara-cfg");
-//TODO readme.md
-//TODO update link in files
 
 //TODO check for invalid session
 //TODO improve termination
