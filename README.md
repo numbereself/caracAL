@@ -77,7 +77,7 @@ There is one big reason and that is
 
 ### Parity with the regular game client
 
-caracAL runs the same files as the regular client. You can use the same scripts in caracAL and in the normal client. This means that you can develop your scripts in the game and later deploy them with caracAL. This is the key selling point over competitors like ALclient, who develops a completely new client entirely and ALbot, who has parity with the game when it first released, but has never bothered to update the underlying game files to the latest version. 
+caracAL runs the same files as the regular client. You can use the same scripts in caracAL and in the normal client. This means that you can develop your scripts in the game and later deploy them with caracAL. This is the key selling point over competitors like ALclient, who develops a completely new client entirely and ALbot, which has only recently switched to an architecture quite similar to caracAL. 
 
 Keep in mind that some functionality does not make sense in a headless client. This notably concerns the lack of a HTML document and a renderer.
 Most HTML routines do not throw an error, but do not expect them to do anything. Calls to PIXI routines should really be mostly avoided.
