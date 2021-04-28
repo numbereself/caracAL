@@ -6,8 +6,8 @@ A Node.js client for [adventure.land](https://adventure.land/ "Adventure Land")
 
 ```bash
 #update packages
-sudo apt update
-sudo apt upgrade
+sudo apt-get update
+sudo apt-get upgrade
 sudo apt-get install git curl
 #install node version manager(nvm)
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
