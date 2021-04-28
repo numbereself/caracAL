@@ -50,7 +50,7 @@ node main.js
 
 ## First run and configuration
 
-When you first run caracAL it will ask you for your login credentials to adventure.land. After you have sucessfully entered them it will ask you to choose a realm and which characters to start. Once these questions are answered caracAL will generate a file config.js for you, containing the information you just enetered. The characters you specified will immediately be loaded into caracAL and start farming crabs using the script example.js.
+When you first run caracAL it will ask you for your login credentials to adventure.land. After you have sucessfully entered them it will ask you to choose a realm and which characters to start. Once these questions are answered caracAL will generate a file config.js for you, containing the information you just entered. The characters you specified will immediately be loaded into caracAL and start farming crabs using the script example.js.
 
 ### config.js
 
@@ -67,20 +67,25 @@ Each character has four fields:
  - enabled: caracAL will only run characters who have this field set to true
  - version: Which version of the game client this character should run. A value of 0 represents the latest version
 
-## Running your own code
-The default code located at `./CODE/example.js`, as specified by the character property realm. This script makes your characters farm tiny crabs on the beach.
+### Running your own code
+The default code located at `./CODE/example.js`, as specified by the character property `script`. This script makes your characters farm tiny crabs on the beach.
 You can create your own scripts in the `./CODE/` directory. Since caracAL runs the same files as the game client you should be able to use the exact same files in caracAL.
 
-### So why should I use caracAL?
+## So why should I use caracAL?
 
 There is one big reason and that is
 
-# Parity with the regular game client
+### Parity with the regular game client
 
-caracAL runs the same files as the regular client. You can use the same scripts in caracAL and in the normal client. This means that you can develop your scripts in the game and later deploy them with caracAL. This is the key selling point over competitors like ALclient, who develops a completely new client entirely and ALbot, who has parity with the game when it first released, but has never bothered to update the underlying game files to the latest version. The CLI aimed to do the same thing, but it ended up poorly emulating a webpage, which led to atrocious performance.
+caracAL runs the same files as the regular client. You can use the same scripts in caracAL and in the normal client. This means that you can develop your scripts in the game and later deploy them with caracAL. This is the key selling point over competitors like ALclient, who develops a completely new client entirely and ALbot, who has parity with the game when it first released, but has never bothered to update the underlying game files to the latest version. 
 
 Keep in mind that some functionality does not make sense in a headless client. This notably concerns the lack of a HTML document and a renderer.
 Most HTML routines do not throw an error, but do not expect them to do anything. Calls to PIXI routines should really be mostly avoided.
+
+### It is fast
+
+Compiling the game sources directly into Node.js V8 engine yields performance which is actually serviceable for smaller devices.
+The CLI aimed to do the same thing, but it ended up poorly emulating a webpage, which led to atrocious performance.
 
 ## Additional features
 
@@ -119,7 +124,7 @@ The information available in `parent.X` is needed by the coordination part of ca
 
 Characters which disconnect or fail to connect in the first place will be automatically reloaded. If you want to prevent this behaviour call `parent.caracAL.shutdown()` within your code.
 
-If you are not comfortable storing a secret like your auth key plaintext in a file carcAL can read it from the process environment variables instead. Just set the environemnt var `AL_SESSION` to your session key and caracAL will use that instead.
+If you are not comfortable storing a secret like your auth key plaintext in a file caracAL can read it from the process environment variables instead. Just set the environment var `AL_SESSION` to your session key and caracAL will use that instead.
 
 ## No-Nonsense rewrite the game
 
@@ -131,7 +136,7 @@ Seems like a use case to rewrite the game client. But, that is not so easy, as b
 
 caracAL downloads the game client files to disk. Once they are stored in the game_files directory you can simply edit them.
 
-By default caracAL uses a version culling mechanism. If you want to preserve versions that you have made many edits on you can either turn the mechanism off in the config, but there is a better way.
+By default caracAL uses a version culling mechanism. If you want to preserve versions that you have made many edits to you can turn the mechanism off in the config, but there is a better way.
 
 You can rename your custom version with many edits to a name that is not numeric. If you do that then caracAL will never delete it. Now you just have edit your config.js to make your bots actually use the version you renamed in this manner. The version will thus be preserved and your bots will continue running it.
 
