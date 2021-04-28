@@ -11,6 +11,8 @@ sudo apt-get upgrade
 sudo apt-get install git curl
 #install node version manager(nvm)
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
+#you need to restart your terminal here
+#so the nvm command can be recognized
 #install recent node(14+)
 nvm install node
 #download caracAL
