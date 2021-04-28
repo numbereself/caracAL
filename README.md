@@ -13,8 +13,9 @@ sudo apt-get install git curl
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
 #you need to restart your terminal here
 #so the nvm command can be recognized
-#install recent node(14+)
-nvm install node
+#install node 14
+#latest(16) does not like socket.io for some reason.
+nvm install 14
 #download caracAL
 git clone https://github.com/numbereself/caracAL.git
 #switch to directory
@@ -27,7 +28,7 @@ node main.js
 
 ## Installation on Windows 10
 
-First download Node.js and npm from
+First download Node.js version 14 and npm from
 
 [https://nodejs.org/en/download/](https://nodejs.org/en/download/ "Node.js homepage")
 
