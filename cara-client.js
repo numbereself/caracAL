@@ -164,10 +164,11 @@ async function make_game(version,addr,port,sess,cid,script_file) {
     }
   });
   vm.runInContext("the_game()",game_context);
+  const reload_timeout = 14;
   const reload_task = setTimeout(function(){
-    console.warn("game not loaded after 7 seconds, reloading");
+    console.warn(`game not loaded after ${reload_timeout} seconds, reloading`);
     extensions.deploy();
-  },7100);
+  },reload_timeout * 1000 + 100);
   console.log("game instance constructed");
   return game_context;
 }
