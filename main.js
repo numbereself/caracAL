@@ -135,11 +135,17 @@ function patch_writing(strim) {
             });
           }
           locs.forEach(blk=>{
-            character_manage[blk].instance.send({
-              type:"receive_cm",
-              name:char_name,
-              data:m.data
-            });
+            try {
+              character_manage[blk].instance.send({
+                type:"receive_cm",
+                name:char_name,
+                data:m.data
+              });
+           } catch (e) {
+              console.error(`Failed to send code message to ${blk}: ${m.data}`);
+              console.error("Management Block: ",character_manage[blk]);
+              console.error("The Error: ",e);
+           }
           });
           break;
       }
