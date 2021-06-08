@@ -45,12 +45,23 @@ function patch_writing(strim) {
 
   const character_manage = cfg.characters;
 
+  function safe_send(target, data) {
+    try {
+      target.instance.send(data);
+    } catch (e) {
+      console.error(`failed to send ipc`);
+      console.error(`target: `,target);
+      console.error("data: ",data);
+      console.error("error: ",e);
+    }
+  }
+
   function update_siblings_and_acc(info) {
     const sib_names = Object.keys(character_manage)
       .filter(x=>character_manage[x].connected).sort();
     
     sib_names.forEach(char=>{
-      character_manage[char].instance.send({
+      safe_send(character_manage[char],{
         type:"siblings_and_acc",
         account:info,
         siblings:sib_names
@@ -83,7 +94,7 @@ function patch_writing(strim) {
       {stdio: ["ignore", "pipe", "pipe", 'ipc']});
     result.stdout.pipe(process.stdout);
     result.stderr.pipe(process.stderr);
-
+    char_block.instance = result;
     result.on("exit",()=>{
       char_block.connected = false;
       char_block.instance = null;
@@ -128,29 +139,23 @@ function patch_writing(strim) {
           const [locs,globs] = partition(recipients,
             x=>character_manage[x] && character_manage[x].connected);
           if(globs.length > 0) {
-            result.send({
+            safe_send(char_block,{
               type:"send_cm",
               to:globs,
               data:m.data
             });
           }
           locs.forEach(blk=>{
-            try {
-              character_manage[blk].instance.send({
-                type:"receive_cm",
-                name:char_name,
-                data:m.data
-              });
-           } catch (e) {
-              console.error(`Failed to send code message to ${blk}: ${m.data}`);
-              console.error("Management Block: ",character_manage[blk]);
-              console.error("The Error: ",e);
-           }
+            safe_send(character_manage[blk],{
+              type:"receive_cm",
+              name:char_name,
+              data:m.data
+            });
           });
           break;
       }
     });
-    char_block.instance = result;
+    
     return result;
   }
   
