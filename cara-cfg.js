@@ -70,7 +70,26 @@ async function prompt_new_cfg() {
     name: 'chars',
     choices: all_chars,
   };
-  const {realm,chars} = await inquirer.prompt([realm_question,char_question]);
+  const web_question = {
+    type: 'list',
+    name: 'use_bwi',
+    message: 'Do you want to use the web monitoring panel?',
+    choices: ["Yes","No"],
+  };
+  const {realm,chars,use_bwi} = 
+    await inquirer.prompt([realm_question,char_question,web_question]);
+  
+  let port = 924;
+  if(use_bwi == "Yes") {
+    port = (await inquirer.prompt([{
+      type: 'number',
+      name: 'port',
+      message: 'What port would you like to run the web panel on? (Default 924)',
+      default: 924
+    }])).port;
+  }
+
+
   function make_cfg_string() {
     return `
 //DO NOT SHARE THIS WITH ANYONE
@@ -82,6 +101,15 @@ module.exports = {
   session:"${session}", 
   //delete all versions except the two latest ones
   cull_versions:true,
+  web_app:{
+    //enables the monitoring dashboard
+    enable_bwi:${use_bwi=='Yes'},
+    //exposes the CODE directory
+    //useful i.e. if you want to
+    //load your code outside of caracAL
+    expose_CODE:false,
+    port:${port}
+  },
   characters:{${all_chars.map(c_name => `
     ${c_name}:{
       realm:"${realm}",

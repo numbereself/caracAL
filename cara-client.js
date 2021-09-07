@@ -6,6 +6,7 @@ const { JSDOM } = require( "jsdom" );
 const node_query = require('jquery');
 const game_files = require("./game_files");
 const fetch = require('node-fetch');
+const monitoring_util = require("./monitoring_util");
 
 process.on('unhandledRejection', function (exception) {
   console.warn("promise rejected: \n",exception);
@@ -72,6 +73,7 @@ async function make_runner(upper,CODE_file,version) {
   vm.runInContext("active = true;parent.code_active = true;set_message('Code Active');if (character.rip) character.trigger('death', {past: true});", runner_context);
   process.send({type: "connected"});
   console.log("runner instance constructed");
+  monitoring_util.register_stat_beat(upper);
   await ev_files([CODE_file],runner_context);
   return runner_context;
 }

@@ -4,6 +4,9 @@ const game_files = require("./game_files");
 const log_rotor = require('logrotate-stream');
 const log_stream = log_rotor({ file: './caracAL.log', size: 1500000, keep: 3 });
 const cara_cfg = require("./cara-cfg");
+const bwi = require("bot-web-interface");
+const monitoring_util = require("./monitoring_util");
+const express = require('express');
 
 //TODO check for invalid session
 //TODO improve termination
@@ -44,6 +47,30 @@ function patch_writing(strim) {
   const default_realm = my_acc.response.servers[0];
 
   const character_manage = cfg.characters;
+
+  //TODO right now this server wont terminate.
+  //this is fine atm because caracAL does not terminate when all chars stop.
+  //when I change this in the future this might change as well.
+  let bwi_instance = {};
+  try {
+    if(cfg.web_app && cfg.web_app.enable_bwi) {
+      bwi_instance = new bwi({
+        port: cfg.web_app.port,
+        password: null
+      });
+    }
+    let express_inst = bwi_instance.router;
+    if(cfg.web_app && cfg.web_app.expose_CODE) {
+      if(!express_inst) {
+        express_inst = express();
+        express_inst.listen(cfg.web_app.port);
+      }
+      express_inst.use('/CODE', express.static(__dirname+'/CODE'));
+    }
+  } catch (e) {
+    console.error(`failed to start web services.`,e);
+    console.error(`no web services will be available`);
+  }
 
   function safe_send(target, data) {
     try {
@@ -96,6 +123,11 @@ function patch_writing(strim) {
     result.stderr.pipe(process.stderr);
     char_block.instance = result;
     result.on("exit",()=>{
+      if(char_block.monitor) {
+        //close monitor
+        char_block.monitor.destroy();
+        char_block.monitor = null;
+      }
       char_block.connected = false;
       char_block.instance = null;
       if(char_block.enabled) {
@@ -153,13 +185,17 @@ function patch_writing(strim) {
             });
           });
           break;
+        default:
+          break;
       }
     });
+    if(bwi_instance.publisher) {
+      char_block.monitor = monitoring_util.create_monitor_ui(bwi_instance,char_name,char_block);
+    }
     
     return result;
   }
   
-
   const tasks = Object.keys(character_manage).forEach(c_name=>{
     const char = character_manage[c_name];
     char.connected = false;
