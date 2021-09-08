@@ -1,7 +1,7 @@
 const io = require("socket.io-client");
 
 (async () => {
-  const socket = io('wss://' + "eu1.adventure.land" + ':' + 2053, {
+  const socket = io('wss://' + "eud1.adventure.land" + ':' + 2053, {
     secure: true,
     transports: ['websocket'],
     query: undefined

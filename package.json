@@ -1,6 +1,6 @@
 {
   "name": "caracal",
-  "version": "0.0.1",
+  "version": "0.1.1",
   "description": "caracAL - Node client for adventure.land",
   "main": "main.js",
   "scripts": {
@@ -9,11 +9,14 @@
   "author": "number_e",
   "license": "MIT",
   "dependencies": {
+    "bot-web-interface": "^2.0.9",
     "inquirer": "^8.0.0",
     "jquery": "^3.6.0",
     "jsdom": "^16.5.3",
     "logrotate-stream": "^0.2.8",
     "node-fetch": "^2.6.1",
-    "socket.io-client": "2.3.0"
+    "pngjs": "^6.0.0",
+    "pretty-ms": "^7.0.1",
+    "socket.io-client": "^4.2.0"
   }
 }

@@ -2,6 +2,23 @@
 
 A Node.js client for [adventure.land](https://adventure.land/ "Adventure Land")
 
+## IMPORTANT! Changes from 2021-09-07
+
+In this recent update Wizard has updated the socket.io version from 2.4 to 4.2. This is generally a good change as it fixes many vulnerabilities. However, older versions of caracAL will cease to function as a result. It is required to update caracAL, as well as reinstall the dependencies.
+
+### Upgrading from a git installation
+
+If you have installed caracAL from cloning this repository you can upgrade by entering the following commands into a terminal:
+
+```bash
+git pull
+npm install
+```
+
+### Simpler version
+
+Simply reinstall caracAL by following the steps below. You can keep the config.js file from your old installation for ease of use.
+
 ## Installation on Debian/Ubuntu
 
 ```bash
@@ -56,7 +73,7 @@ node main.js
 
 ## First run and configuration
 
-When you first run caracAL it will ask you for your login credentials to adventure.land. After you have sucessfully entered them it will ask you to choose a realm and which characters to start. Once these questions are answered caracAL will generate a file config.js for you, containing the information you just entered. The characters you specified will immediately be loaded into caracAL and start farming crabs using the script example.js.
+When you first run caracAL it will ask you for your login credentials to adventure.land. After you have sucessfully entered them it will ask you to choose a realm and which characters to start. Finally it will ask you if you want to use the bot monitoring panel, and if you answer that with yes also what port you want it to be on. Once these questions are answered caracAL will generate a file config.js for you, containing the information you just entered. The characters you specified will immediately be loaded into caracAL and start farming crabs using the script example.js.
 
 ### config.js
 
@@ -65,6 +82,11 @@ The session key represents you login into adventure.land. This is the reason why
 caracAL stores versions of the game client on your disk, in the game_files folder.
 If set, the cull_versions key makes caracAL delete these versions, except the two most recent ones.
 Versions which are not numeric will not be considered for culling.
+
+The web_app section contains configuration that enables caracAL to host a webserver. The port option herein allows to choose which port the webserver should be hosted on.
+The enable_bwi option opens a monitoring panel that displays the status of the characters running within caracAL if set to true.
+The expose_CODE option shares the CODE directory, where your scripts are located, via the webserver. This is useful if you i.e. want to load the scripts you are using in caracAL from the steam client. Scripts shared in this manner will be available i.e. under the URL `localhost:924/CODE/tests/cm_test.js`.
+If you do not enable either of these options no webserver will be opened. config.js files which do not have the web_app section, i.e. those, which were created before the update, will not open a webserver either.
 
 The characters key contains information about which characters to run. 
 Each character has four fields:
@@ -146,14 +168,23 @@ By default caracAL uses a version culling mechanism. If you want to preserve ver
 
 You can rename your custom version with many edits to a name that is not numeric. If you do that then caracAL will never delete it. Now you just have edit your config.js to make your bots actually use the version you renamed in this manner. The version will thus be preserved and your bots will continue running it.
 
+## Bot Monitoring Panel
+
+In the most recent version caracAL added the ability to check up on your bots through a web interface. It can be acessed with a browser, such as firefox or chrome. You need to enable this feature through the config.js file, the details of which are also in this document. If you run caracAL on the same machine as your browser and on the default port you can access the panel under the url `http://localhost:924/`.
+It looks somewhat like this:
+![BWI Image](https://github.com/numbereself/caracAL/blob/master/presentation/bwi.png?raw=true)
+
+Some people might know this look from ALBot. It is actually the same technology at work. The minimap does not work right now, but will be patched in as part of a later update.
+
+The panel also does not yet have options to control your bots. Such a feature is not yet planned, but once I have a good idea of how it could look, I might just work on implementing it.
+
+Lastly, if you want to take a look at the game from a spectator standpoint or control your bots by sending commands to them there is always [the Comm Panel](https://adventure.land/comm?scale=1 "The Comm Panel").
+
 ## What caracAL does not (yet) have
 
 The localStorage API from Browser is only implemented as a mock, but the functionality is virtually not present.
 Implementing a localStorage API in Node in a way that works in multiprocess applications is hard. As a result no satisfying replacement exists as of yet.
 The recommended alternative is to check wether or not your script is running in caracAL, and if it is fall back to using the Node `fs` API.
-
-In the initial release caracAL does not have a web interface. Efforts are underway to porting the bot-web-interface from ALbot into caracAL.
-In the meantime you can monitor your bots through [the Comm Panel](https://adventure.land/comm?scale=1 "The Comm Panel").
 
 ## Contributing
 
