@@ -172,7 +172,7 @@ You can rename your custom version with many edits to a name that is not numeric
 
 In the most recent version caracAL added the ability to check up on your bots through a web interface. It can be acessed with a browser, such as firefox or chrome. You need to enable this feature through the config.js file, the details of which are also in this document. If you run caracAL on the same machine as your browser and on the default port you can access the panel under the url `http://localhost:924/`.
 It looks somewhat like this:
-![BWI Image](https://github.com/numbereself/caracAL/blob/master/presentation/bwi.png?raw=true)
+![BWI Image](https://github.com/numbereself/caracAL/blob/main/presentation/bwi.png?raw=true)
 
 Some people might know this look from ALBot. It is actually the same technology at work. The minimap does not work right now, but will be patched in as part of a later update.
 
