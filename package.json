@@ -15,6 +15,7 @@
     "jsdom": "^16.5.3",
     "logrotate-stream": "^0.2.8",
     "node-fetch": "^2.6.1",
+    "pngjs": "^6.0.0",
     "pretty-ms": "^7.0.1",
     "socket.io-client": "^4.2.0"
   }

@@ -1,5 +1,6 @@
 const prettyMilliseconds = require('pretty-ms');
 const stat_beat_interval = 500;
+const {PNG} = require('pngjs');
 
 function humanize_int(num, digits) {
   num = Math.round(num);
@@ -77,10 +78,10 @@ function create_monitor_ui(bwi,char_name,child_block) {
     {name: "inv", type: "labelProgressBar", label: "Inventory", options: {color: "brown"}, 
       getter:()=>quick_bar_val(last_beat.isize - last_beat.esize,last_beat.isize)},
     {name: "gold", type: "text", label: "Gold", getter:()=>humanize_int(last_beat.gold,1)},
-    {name: "party_leader", type: "text", label: "Party Leader", getter:()=>last_beat.party},
+    {name: "party_leader", type: "text", label: "Chief", getter:()=>last_beat.party || "N/A"},
     {name: "current_status", type: "text", label: "Status", getter:()=>last_beat.current_status},
     {name: "target", type: "text", label: "Target",
-      getter:()=>last_beat.t_name && (last_beat.mtype && "" || "Player ")+last_beat.t_name || "None"},
+      getter:()=>last_beat.t_name && (last_beat.mtype ? "Player " : "")+last_beat.t_name || "None"},
     {name: "gph", type: "text", label: "Gold/h", getter:()=>humanize_int(val_ph(gold_histo),1)},
     {name: "xpph", type: "text", label: "XP/h", getter:()=>humanize_int(xp_ph,1)},
     {name: "ttlu", type: "text", label: "TTLU", 
@@ -106,6 +107,52 @@ function create_monitor_ui(bwi,char_name,child_block) {
     return result;
   });
   return ui;
+}
+
+const mmap_cols = {
+  background:[0,0,0,0]
+};
+const mmap_w = 200;
+const mmap_h = 150;
+
+function generate_minimap(game_context) {
+  var png = new PNG({
+    width: 200,
+    height: 150,
+    filterType: -1
+  });
+  const i_data = png.data;
+  function set_point(i,col) {
+    i_data[i] = col[0];
+    i_data[i+1] = col[1];
+    i_data[i+2] = col[2];
+    i_data[i+3] = col[3];
+  }
+  function fill_rect(x1,y1,x2,y2,col) {
+    for (let i = x1; i < x2; i++) {
+      for (let j = y1; j < y2; j++) {
+        let idd = (png.width * j + i) << 2;
+        set_point(idd,col);
+      }
+    }
+  }
+  function safe_fill_rect(x1,y1,x2,y2,col) {
+    const w = png.width;
+    const h = png.h;
+    x1 = max( 0, min(x1, w) );
+    x2 = max( 0, min(x2, w) );
+    y1 = max( 0, min(y1, h) );
+    y2 = max( 0, min(y2, h) );
+    fill_rect(x1,y1,x2,y2,col);
+  }
+
+  //fill with bg data
+  for (let j = 0; j < png.data.length / 4; j++) {
+    let idd = j << 2;
+    set_point(idd,mmap_cols.background);
+  }
+
+  return PNG.sync.write(png);
 }
 
 exports.create_monitor_ui = create_monitor_ui;

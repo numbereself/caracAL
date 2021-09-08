@@ -73,7 +73,7 @@ node main.js
 
 ## First run and configuration
 
-When you first run caracAL it will ask you for your login credentials to adventure.land. After you have sucessfully entered them it will ask you to choose a realm and which characters to start. Once these questions are answered caracAL will generate a file config.js for you, containing the information you just entered. The characters you specified will immediately be loaded into caracAL and start farming crabs using the script example.js.
+When you first run caracAL it will ask you for your login credentials to adventure.land. After you have sucessfully entered them it will ask you to choose a realm and which characters to start. Finally it will ask you if you want to use the bot monitoring panel, and if you answer that with yes also what port you want it to be on. Once these questions are answered caracAL will generate a file config.js for you, containing the information you just entered. The characters you specified will immediately be loaded into caracAL and start farming crabs using the script example.js.
 
 ### config.js
 
@@ -172,7 +172,7 @@ You can rename your custom version with many edits to a name that is not numeric
 
 In the most recent version caracAL added the ability to check up on your bots through a web interface. It can be acessed with a browser, such as firefox or chrome. You need to enable this feature through the config.js file, the details of which are also in this document. If you run caracAL on the same machine as your browser and on the default port you can access the panel under the url `http://localhost:924/`.
 It looks somewhat like this:
-![BWI Image](https://github.com/numbereself/caracAL/blob/bwi-branch/presentation/bwi.png?raw=true)
+![BWI Image](https://github.com/numbereself/caracAL/blob/master/presentation/bwi.png?raw=true)
 
 Some people might know this look from ALBot. It is actually the same technology at work. The minimap does not work right now, but will be patched in as part of a later update.
 
