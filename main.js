@@ -53,7 +53,8 @@ function patch_writing(strim) {
   //when I change this in the future this might change as well.
   let bwi_instance = {};
   try {
-    if(cfg.web_app && cfg.web_app.enable_bwi) {
+    if(cfg.web_app && 
+      (cfg.web_app.enable_bwi || cfg.web_app.enable_minimap)) {
       bwi_instance = new bwi({
         port: cfg.web_app.port,
         password: null
@@ -73,14 +74,14 @@ function patch_writing(strim) {
   }
 
   function safe_send(target, data) {
-    try {
-      target.instance.send(data);
-    } catch (e) {
-      console.error(`failed to send ipc`);
-      console.error(`target: `,target);
-      console.error("data: ",data);
-      console.error("error: ",e);
-    }
+    target.instance.send(data, undefined, undefined, (e) => {
+      //This can occur due to node closing ipc
+      //before firing its close handlers
+      if (e) {
+        //console.error(`failed to send ipc`);
+        //console.error(`target: `,target);
+      }
+    });
   }
 
   function update_siblings_and_acc(info) {
@@ -116,7 +117,8 @@ function patch_writing(strim) {
     const g_version = char_block.version || version;
     console.log(`starting ${char_name} running version ${g_version} in ${char_block.realm}`);
     
-    const args = [g_version,realm.addr,realm.port,sess,char.id, char_block.script];
+    const args = [g_version,realm.addr,realm.port,sess,char.id,
+       char_block.script, cfg.web_app && cfg.web_app.enable_minimap && "yesmap" || "nomap"];
     const result = child_process.fork("./cara-client.js",args,
       {stdio: ["ignore", "pipe", "pipe", 'ipc']});
     result.stdout.pipe(process.stdout);
@@ -190,7 +192,7 @@ function patch_writing(strim) {
       }
     });
     if(bwi_instance.publisher) {
-      char_block.monitor = monitoring_util.create_monitor_ui(bwi_instance,char_name,char_block);
+      char_block.monitor = monitoring_util.create_monitor_ui(bwi_instance,char_name,char_block,cfg.web_app.enable_minimap);
     }
     
     return result;

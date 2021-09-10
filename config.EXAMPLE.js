@@ -10,6 +10,10 @@ module.exports = {
   web_app:{
     //enables the monitoring dashboard
     enable_bwi:false,
+    //enables the minimap in dashboard
+    //setting this to true implicitly
+    //enables the dashboard
+    enable_minimap:false,
     //exposes the CODE directory
     //useful i.e. if you want to
     //load your code outside of caracAL

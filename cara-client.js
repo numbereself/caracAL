@@ -78,7 +78,7 @@ async function make_runner(upper,CODE_file,version) {
   return runner_context;
 }
 
-async function make_game(version,addr,port,sess,cid,script_file) {
+async function make_game(version,addr,port,sess,cid,script_file,enable_map) {
   const game_sources = game_files.get_game_files().map(f=>
     game_files.locate_game_file(f,version))
     .concat(["./html_vars.js"]);
@@ -115,6 +115,9 @@ async function make_game(version,addr,port,sess,cid,script_file) {
     process.send({
       type: "shutdown"
     });
+  }
+  extensions.map_enabled = function() {
+    return enable_map;
   }
   
   game_context.caracAL = extensions;
@@ -184,7 +187,8 @@ async function caracal_start() {
   const sess = args[3];
   const cid = args[4];
   const script_file = args[5];
-  await make_game(version,realm_addr,realm_port,sess,cid, script_file);
+  const enable_map = args[6]=="yesmap";
+  await make_game(version,realm_addr,realm_port,sess,cid, script_file,enable_map);
 }
 
 caracal_start();

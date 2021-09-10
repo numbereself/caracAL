@@ -32,6 +32,32 @@ async function make_auth(email,password) {
   return null;
 }
 
+async function prompt_chars(all_chars) {
+  const enabled_chars = [];
+  while (true) {
+    const char_question = {
+      type: 'list',
+      message: `Which characters do you want to run?
+Select 'Deploy' when you are done choosing`,
+      name: 'chara',
+      choices: [{name:`Deploy ${enabled_chars.length} characters`,value:-1}]
+        .concat(all_chars.map((x,i)=>({value:i,
+          name:enabled_chars.includes(i) && `Disable ${x}` || `Enable ${x}`}))),
+      default:1
+    };
+    const {chara} = await inquirer.prompt([char_question]);
+    if(chara == -1) {
+      break;
+    }
+    if(enabled_chars.includes(chara)) {
+      enabled_chars.splice(enabled_chars.indexOf(chara), 1);
+    } else {
+      enabled_chars.push(chara);
+    }
+  }
+  return enabled_chars;
+}
+
 async function prompt_new_cfg() {
   let session = null;
   while(!session) {
@@ -58,38 +84,44 @@ async function prompt_new_cfg() {
   my_acc.auto_update = false;
   const all_realms = my_acc.response.servers.map(x=>x.key);
   const all_chars = my_acc.response.characters.map(x=>x.name);
-  const realm_question = {
-    type: 'list',
-    name: 'realm',
-    message: 'Which realm do you want your chars to run in',
-    choices: all_realms,
-  };
-  const char_question = {
-    type: 'checkbox',
-    message: 'Which characters do you want to run',
-    name: 'chars',
-    choices: all_chars,
-  };
-  const web_question = {
-    type: 'list',
-    name: 'use_bwi',
-    message: 'Do you want to use the web monitoring panel?',
-    choices: ["Yes","No"],
-  };
-  const {realm,chars,use_bwi} = 
-    await inquirer.prompt([realm_question,char_question,web_question]);
-  
-  let port = 924;
-  if(use_bwi == "Yes") {
-    port = (await inquirer.prompt([{
+  const yesno_choice = [{value:true,name:"Yes"},{value:false,name:"No"}];
+  const enabled_chars = await prompt_chars(all_chars);
+  if(enabled_chars.length <= 0) {
+    console.warn("you did not enable any chars");
+    console.log("but you can change that manually in the config file");
+  }
+  const {realm,use_bwi,use_minimap,port} = 
+    await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'realm',
+      message: 'Which realm do you want your chars to run in',
+      choices: all_realms,
+    },{
+      type: 'list',
+      name: 'use_bwi',
+      message: 'Do you want to use the web monitoring panel?',
+      choices: yesno_choice,
+    },{
+      type: 'list',
+      name: 'use_minimap',
+      message: `Do you also want to enable the minimap?
+If you want max performance you should choose no.`,
+      choices: yesno_choice,
+      when(answers) {
+        return answers.use_bwi;
+      }
+    },{
       type: 'number',
       name: 'port',
-      message: 'What port would you like to run the web panel on? (Default 924)',
+      message: 'What port would you like to run the web panel on?',
+      when(answers) {
+        return answers.use_bwi;
+      },
       default: 924
-    }])).port;
-  }
-
-
+    }
+  ]);
+  //console.log({realm,use_bwi,use_minimap,port});
   function make_cfg_string() {
     return `
 //DO NOT SHARE THIS WITH ANYONE
@@ -103,18 +135,22 @@ module.exports = {
   cull_versions:true,
   web_app:{
     //enables the monitoring dashboard
-    enable_bwi:${use_bwi=='Yes'},
+    enable_bwi:${use_bwi},
+    //enables the minimap in dashboard
+    //setting this to true implicitly
+    //enables the dashboard
+    enable_minimap:${use_minimap || false},
     //exposes the CODE directory
     //useful i.e. if you want to
     //load your code outside of caracAL
     expose_CODE:false,
-    port:${port}
+    port:${port || 924}
   },
-  characters:{${all_chars.map(c_name => `
+  characters:{${all_chars.map((c_name,i) => `
     ${c_name}:{
       realm:"${realm}",
       script:"example.js",
-      enabled:${chars.includes(c_name)},
+      enabled:${enabled_chars.includes(i)},
       version:0
     },`).join("")}
   }
@@ -122,8 +158,9 @@ module.exports = {
     `;
   }
   await fs.writeFile('./config.js', make_cfg_string());
-  return [chars];
 }
+
+
 
 async function interactive() {
   try {
@@ -132,11 +169,7 @@ async function interactive() {
   } catch (e){
     console.warn("config file does not exist. lets fix that!");
     console.log("first we need to log you in");
-    const [enabled_chars] = await prompt_new_cfg();
-    if(enabled_chars.length <= 0) {
-      console.warn("you did not enable any chars");
-      console.log("but you can change that manually in the config file");
-    }
+    await prompt_new_cfg();
     console.log("config file created. lets get started!");
     console.log("(you can change any choices you made in config.js)");
   }
