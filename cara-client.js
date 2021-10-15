@@ -7,6 +7,7 @@ const node_query = require('jquery');
 const game_files = require("./game_files");
 const fetch = require('node-fetch');
 const monitoring_util = require("./monitoring_util");
+const ipc_storage = require("./ipcStorage");
 
 process.on('unhandledRejection', function (exception) {
   console.warn("promise rejected: \n",exception);
@@ -33,6 +34,11 @@ function make_context(upper = null) {
   result.require = require;
   if(upper) {
     Object.defineProperty(result, "parent", {value: upper});
+    result._localStorage = upper._localStorage;
+    result._sessionStorage = upper._sessionStorage;
+  } else {
+    result._localStorage = ipc_storage.make_IPC_storage("ls");;
+    result._sessionStorage = ipc_storage.make_IPC_storage("ss");;
   }
   vm.createContext(result);
 

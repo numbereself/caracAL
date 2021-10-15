@@ -13,6 +13,7 @@
     "inquirer": "^8.0.0",
     "jquery": "^3.6.0",
     "jsdom": "^16.5.3",
+    "json-storage-fs": "^2.0.2",
     "logrotate-stream": "^0.2.8",
     "node-fetch": "^2.6.1",
     "pngjs": "^6.0.0",

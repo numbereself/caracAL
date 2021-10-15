@@ -7,6 +7,7 @@ const cara_cfg = require("./cara-cfg");
 const bwi = require("bot-web-interface");
 const monitoring_util = require("./monitoring_util");
 const express = require('express');
+const json_storage_fs = require('json-storage-fs');
 
 //TODO check for invalid session
 //TODO improve termination
@@ -36,6 +37,13 @@ function patch_writing(strim) {
   await cara_cfg.interactive();
   patch_writing(process.stdout);
   patch_writing(process.stderr);
+  
+  json_storage_fs.config({ catalog: './localStorage'});
+  const localStorage = json_storage_fs.JsonStorage;
+  const sessionStorage = new Map();
+  localStorage.set('caracAL', 'Yeah');
+  sessionStorage.set('caracAL', 'Yup');
+
   const version = await game_files.ensure_latest();
 
   const cfg = require("./config");
@@ -74,14 +82,16 @@ function patch_writing(strim) {
   }
 
   function safe_send(target, data) {
-    target.instance.send(data, undefined, undefined, (e) => {
-      //This can occur due to node closing ipc
-      //before firing its close handlers
-      if (e) {
-        //console.error(`failed to send ipc`);
-        //console.error(`target: `,target);
-      }
-    });
+    if(target.instance) {
+      target.instance.send(data, undefined, undefined, (e) => {
+        //This can occur due to node closing ipc
+        //before firing its close handlers
+        if (e) {
+          //console.error(`failed to send ipc`);
+          //console.error(`target: `,target);
+        }
+      });
+    }
   }
 
   function update_siblings_and_acc(info) {
@@ -186,6 +196,57 @@ function patch_writing(strim) {
               data:m.data
             });
           });
+          break;
+        //localStorage and sessionStorage related
+        case "stor":
+          const trg_store = m.ident == "ls"
+            ? localStorage
+            : sessionStorage;
+          switch(m.op) {
+            case "set":
+              for(let key in m.data) {
+                trg_store.set(key,m.data[key]);
+              }
+              break;
+            case "del":
+              for(let key of m.data) {
+                trg_store.delete(key);
+              }
+              break;
+            case "clear":
+              if(m.ident == "ls") {
+                localStorage.clearAll();
+              } else {
+                sessionStorage.clear();
+              }
+              break;
+            case "init":
+              const catchup_data={};
+              if(m.ident == "ls") {
+                localStorage.getAllKeys().forEach(
+                  key=>catchup_data[key] = localStorage.get(key));
+              } else {
+                sessionStorage.forEach(
+                  (value, key)=>catchup_data[key]=value);
+              }
+              safe_send(char_block,{
+                type:"stor",
+                op:"set",
+                ident:m.ident,
+                data:catchup_data
+              });
+              break;
+            default:
+              break;
+          }
+          if(m.op != "init") {
+            //forward to other running processes
+            Object.values(character_manage)
+              .filter(x=>x.instance)
+              .forEach(block=>{
+                safe_send(block,m);
+              });
+          }
           break;
         default:
           break;
