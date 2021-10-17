@@ -1,3 +1,3 @@
 # localStorage
 
-In this directory caracAL will store the localStorage API data
+In this directory caracAL will store the localStorage data
