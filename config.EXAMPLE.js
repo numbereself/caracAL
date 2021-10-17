@@ -23,19 +23,19 @@ module.exports = {
   characters:{
     Wizard:{
       realm:"EUPVP",
-      script:"example.js",
+      script:"caracAL/examples/crabs.js",
       enabled:true,
       version:0
     },
     MERC:{
       realm:"USIII",
-      script:"deploy_test.js",
+      script:"caracAL/tests/deploy_test.js",
       enabled:true,
       version:"halflife3"
     },
     GG:{
       realm:"ASIAI",
-      script:"cm_test.js",
+      script:"caracAL/tests/cm_test.js",
       enabled:false,
       version:0
     },

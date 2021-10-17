@@ -2,9 +2,9 @@
 
 A Node.js client for [adventure.land](https://adventure.land/ "Adventure Land")
 
-## IMPORTANT! Changes from 2021-09-07
+## IMPORTANT! Changes from 2021-10-17
 
-In this recent update Wizard has updated the socket.io version from 2.4 to 4.2. This is generally a good change as it fixes many vulnerabilities. However, older versions of caracAL will cease to function as a result. It is required to update caracAL, as well as reinstall the dependencies.
+This update finally introduces localStorage and sessionStorage. However, in order to provide these technologies we need to bring in additional dependencies. Follow the steps below to upgrade to the most recent version. This version renames the default scripts. The default code file `example.js` now resides in `caracAL/examples/crabs.js`. If you were running the default crab script please edit or regenerate your config file in order to match the changed filename. 
 
 ### Upgrading from a git installation
 
@@ -155,6 +155,16 @@ Characters which disconnect or fail to connect in the first place will be automa
 
 If you are not comfortable storing a secret like your auth key plaintext in a file caracAL can read it from the process environment variables instead. Just set the environment var `AL_SESSION` to your session key and caracAL will use that instead.
 
+## localStorage and sessionStorage
+
+Web Storage technology is pretty handy when you want to have data that persists through character reloads. For the longest time, there was no really good possibility to realize these technologys in Node.js. With version 0.2.0 however, caracAL added support for them. `window.localStorage`, as well as `window.sessionStorage` are provided, and behave very much like their web counterparts. This subsequently means that the runner functions `get(key)`, as well as `set(key,value)` also work.
+
+### Technical Details
+
+The implementations are custom made specifically for caracAL. The key value stores are kept in memory, with localStorage additionally being written to file.
+Keep in mind that every character process, as well as the coordinator process keeps a copy of localStorage and sessionStorage, so dont put too large data in there.
+Writing operations on these stores are comunicated to your characters via IPC messages, and these messages are sent to every character.
+
 ## No-Nonsense rewrite the game
 
 Imagine there is an update but there is a null check missing from the client. Actually dont imagine that, just look at the gif:
@@ -181,11 +191,7 @@ The panel also does not yet have options to control your bots. Such a feature is
 
 Lastly, if you want to take a look at the game from a spectator standpoint or control your bots by sending commands to them there is always [the Comm Panel](https://adventure.land/comm?scale=1 "The Comm Panel").
 
-## What caracAL does not (yet) have
-
-The localStorage API from Browser is only implemented as a mock, but the functionality is virtually not present.
-Implementing a localStorage API in Node in a way that works in multiprocess applications is hard. As a result no satisfying replacement exists as of yet.
-The recommended alternative is to check wether or not your script is running in caracAL, and if it is fall back to using the Node `fs` API.
+An improved version is already in the making.
 
 ## Contributing
 

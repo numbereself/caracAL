@@ -149,7 +149,7 @@ module.exports = {
   characters:{${all_chars.map((c_name,i) => `
     ${c_name}:{
       realm:"${realm}",
-      script:"example.js",
+      script:"caracAL/examples/crabs.js",
       enabled:${enabled_chars.includes(i)},
       version:0
     },`).join("")}

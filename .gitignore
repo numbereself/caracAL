@@ -9,5 +9,5 @@
 .idea/
 /package-lock.json
 /CODE/*
-!/CODE/example.js
-!/CODE/tests/
+!/CODE/README.md
+!/CODE/caracAL/

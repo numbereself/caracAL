@@ -1,5 +1,3 @@
-//TODO thoroughly test this
-//like ill do that lol
 function make_IPC_storage(ident) {
   const items = new Map();
   const mock_parent = {
@@ -60,6 +58,7 @@ function make_IPC_storage(ident) {
       }
     }
   });
+  
   process.send({
     type:"stor",
     op:"init",
@@ -82,7 +81,7 @@ function make_IPC_storage(ident) {
     },
     //return contents but not base keys
     ownKeys: function (oTarget, sKey) {
-      return items.keys().filter(key=>!(key in mock_parent));
+      return Array.from(items.keys()).filter(key=>!(key in mock_parent));
     },
     has: function (oTarget, sKey) {
       return (sKey in mock_parent) || items.has(sKey);
