@@ -86,7 +86,7 @@ Versions which are not numeric will not be considered for culling.
 The web_app section contains configuration that enables caracAL to host a webserver. The port option herein allows to choose which port the webserver should be hosted on.
 The enable_bwi option opens a monitoring panel that displays the status of the characters running within caracAL if set to true.
 The enable_minimap option configures if caracAL should generate a minimap summarizing your current game state. The minimap is located in the monitoring panel. Therefore, if the minimap is enabled, the monitoring panel will always be served and ignore the previous setting.
-The expose_CODE option shares the CODE directory, where your scripts are located, via the webserver. This is useful if you i.e. want to load the scripts you are using in caracAL from the steam client. Scripts shared in this manner will be available i.e. under the URL `localhost:924/CODE/tests/cm_test.js`.
+The expose_CODE option shares the CODE directory, where your scripts are located, via the webserver. This is useful if you i.e. want to load the scripts you are using in caracAL from the steam client. Scripts shared in this manner will be available i.e. under the URL `localhost:924/CODE/caracAL/tests/cm_test.js`.
 If you do not enable either of these options no webserver will be opened. config.js files which do not have the web_app section, i.e. those, which were created before the update, will not open a webserver either.
 
 The characters key contains information about which characters to run. 
