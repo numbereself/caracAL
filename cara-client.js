@@ -63,7 +63,11 @@ async function make_runner(upper,CODE_file,version) {
   console.log("constructing runner instance");
   console.debug("source files:\n%s",runner_sources);
   const runner_context = make_context(upper);
-  vm.runInContext("var active=false,catch_errors=true,is_code=1,is_server=0,is_game=0,is_bot=parent.is_bot,is_cli=parent.is_cli;", runner_context);
+  //contents of adventure.land/runner
+  //its an html file but not labeled as such
+  //TODO in the future i should consider parsing the relevant parts out of the html files directly
+  //for the runners as well as the instances
+  vm.runInContext("var active=false,catch_errors=true,is_code=1,is_server=0,is_game=0,is_bot=parent.is_bot,is_cli=parent.is_cli,is_sdk=parent.is_sdk;", runner_context);
   await ev_files(runner_sources,runner_context);
   runner_context.send_cm = function(to, data) {
     process.send({
