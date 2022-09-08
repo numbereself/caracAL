@@ -9,7 +9,7 @@ async function make_auth(email,password) {
   const raw = await fetch('https://adventure.land/api/signup_or_login', {
     method: 'POST',
     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-    body: 'arguments={"email":"' + email + '","password":"' + password + '","only_login":true}&method=signup_or_login'
+    body: 'arguments={"email":"' + encodeURIComponent(email) + '","password":"' + encodeURIComponent(password) + '","only_login":true}&method=signup_or_login'
   });
   if(!raw.ok) {
     throw new Error(`failed to call login api: ${raw.statusText}`);
@@ -176,5 +176,6 @@ async function interactive() {
 }
 
 exports.interactive = interactive;
+exports.prompt_new_cfg = prompt_new_cfg;
 //interactive();
 //prompt_new_cfg();
