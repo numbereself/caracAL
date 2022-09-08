@@ -2,6 +2,12 @@
 
 A Node.js client for [adventure.land](https://adventure.land/ "Adventure Land")
 
+### Changelog for 2022-09-08
+
+Minor bugfixes with a larger impact.
+smart_move should now be usable again.
+Also special characters are now respected in login process
+
 ## IMPORTANT! Changes from 2021-10-17
 
 This update finally introduces localStorage and sessionStorage. However, in order to provide these technologies we need to bring in additional dependencies. Follow the steps below to upgrade to the most recent version. This version renames the default scripts. The default code file `example.js` now resides in `caracAL/examples/crabs.js`. If you were running the default crab script please edit or regenerate your config file in order to match the changed filename. 
