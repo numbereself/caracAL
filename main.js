@@ -8,6 +8,8 @@ const bwi = require("bot-web-interface");
 const monitoring_util = require("./monitoring_util");
 const express = require('express');
 const json_storage_fs = require('json-storage-fs');
+const { constants } = require('fs');
+const fs = require('fs').promises;
 
 //TODO check for invalid session
 //TODO improve termination
@@ -38,8 +40,31 @@ function patch_writing(strim) {
   patch_writing(process.stdout);
   patch_writing(process.stderr);
   
+  //json-storage-fs ocasionally creates empty files
+  //and afterwards complains that they are not json
+  //we provide workaround.
+  const json_storage_path = "./localStorage/storage.json";
+  try {
+    const stor_size = (await fs.stat(json_storage_path)).size;
+    //if the file is empty we delete it
+    //later we initialize it with {}
+    if(stor_size == 0) {
+      console.log("storage.json is empty. we will regenerate it");
+      await fs.unlink(json_storage_path);
+    }
+  } catch (e){
+    //file probably doesnt exist yet, we create it
+  }
+  try {
+    //check if file exists
+    await fs.access(json_storage_path, constants.R_OK);
+  } catch (e){
+    //write initial storage.json
+    await fs.writeFile(json_storage_path,"{}");
+  }
   json_storage_fs.config({ catalog: './localStorage'});
   const localStorage = json_storage_fs.JsonStorage;
+
   const sessionStorage = new Map();
   localStorage.set('caracAL', 'Yeah');
   sessionStorage.set('caracAL', 'Yup');
