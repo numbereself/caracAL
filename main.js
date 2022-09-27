@@ -59,6 +59,7 @@ function patch_writing(strim) {
     //check if file exists
     await fs.access(json_storage_path, constants.R_OK);
   } catch (e){
+    //probably doesnt exist.
     //write initial storage.json
     await fs.writeFile(json_storage_path,"{}");
   }

@@ -2,6 +2,11 @@
 
 A Node.js client for [adventure.land](https://adventure.land/ "Adventure Land")
 
+### Changelog for 2022-09-27
+
+Fixes for storage.json sometimes being completely empty.
+If caracAL worked for you and you werent getting `Unexpected end of JSON input` you dont need to update.
+
 ### Changelog for 2022-09-08
 
 Minor bugfixes with a larger impact.
