@@ -13,7 +13,6 @@ process.on('unhandledRejection', function (exception) {
   console.warn("promise rejected: \n",exception);
 });
 
-
 const html_spoof = `<!DOCTYPE html>
 <html>
 <head>
@@ -81,10 +80,38 @@ async function make_runner(upper,CODE_file,version) {
     return await ev_files(locations.map(x=>"./CODE/"+x),runner_context);
   }
   vm.runInContext("active = true;parent.code_active = true;set_message('Code Active');if (character.rip) character.trigger('death', {past: true});", runner_context);
+  
+  process.on("message", (m) => {
+    switch (m.type) {
+      case "closing_client":
+        console.log("terminating self");
+        vm.runInContext("on_destroy()", runner_context);
+        process.exit();
+        //vscode says this is unreachable.
+        //with how whack node is better be safe
+        break;
+    }
+  });
+
+  //so.
+  //these should send a shutdown to parent
+  //parent deletes instance and marks them inactive
+  //if its duplicate then no instance and no double shutdown
+  ['SIGINT', 'SIGTERM', 'SIGQUIT']
+  .forEach(signal => process.on(signal, async () => {
+    console.log(`Received ${signal} on client. Requesting termination`);
+    process.send({
+      type: "shutdown"
+    });
+  }));
+  
   process.send({type: "connected"});
+  
   console.log("runner instance constructed");
   monitoring_util.register_stat_beat(upper);
   await ev_files([CODE_file],runner_context);
+  //TODO put a process end handler here
+  
   return runner_context;
 }
 
@@ -108,10 +135,7 @@ async function make_game(version,addr,port,sess,cid,script_file,enable_map) {
   //expose the block under parent.caracAL
   const extensions = {};
   extensions.deploy = function(char_name, realm, script_file, game_version) {
-    if(!char_name && !realm && !script_file && !game_version) {
-      //just await being reloaded
-      process.exit(0);
-    } else {
+    
       process.send({
         type: "deploy",
           ...(char_name && {character:char_name}),
@@ -119,7 +143,7 @@ async function make_game(version,addr,port,sess,cid,script_file,enable_map) {
           ...(script_file && {script:script_file}),
           ...(game_version && {version:game_version})
       });
-    }
+    
   }
   extensions.shutdown = function() {
     process.send({

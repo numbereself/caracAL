@@ -108,8 +108,8 @@ function patch_writing(strim) {
   }
 
   function safe_send(target, data) {
-    if(target.instance) {
-      target.instance.send(data, undefined, undefined, (e) => {
+    if(target) {
+      target.send(data, undefined, undefined, (e) => {
         //This can occur due to node closing ipc
         //before firing its close handlers
         if (e) {
@@ -120,12 +120,46 @@ function patch_writing(strim) {
     }
   }
 
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+  //attempts to softkill child processes
+  //by sending an ipc if the client is connected and giving some timeout
+  //why not actual SIGTERM? cause windows cant even
+  async function softkill_block(char_block) {
+    
+    const proc = char_block.instance;
+    char_block.instance = null;
+    if(proc) {
+      if(char_block.connected) {
+        console.log("telling client to self-terminate");
+        safe_send(proc,{
+          type:"closing_client"
+        });
+        const ended_graceful = await Promise.race([
+          sleep(500),
+          new Promise(resolve => {
+            proc.on('exit', function() {
+              console.log("Client terminated gracefully");
+              resolve(true);
+            });
+          })
+        ]);
+        if(ended_graceful) {
+          return;
+        }
+      }
+      console.log("Hard-terminating client");
+      proc.kill("SIGKILL");
+    }
+  }
+
   function update_siblings_and_acc(info) {
     const sib_names = Object.keys(character_manage)
       .filter(x=>character_manage[x].connected).sort();
     
     sib_names.forEach(char=>{
-      safe_send(character_manage[char],{
+      safe_send(character_manage[char].instance,{
         type:"siblings_and_acc",
         account:info,
         siblings:sib_names
@@ -187,19 +221,22 @@ function patch_writing(strim) {
           const candidate = character_manage[new_char_name] || {};
           character_manage[new_char_name] = candidate;
           candidate.enabled = true;
-          candidate.connected = false;
           candidate.realm = m.realm || char_block.realm;
           candidate.script = m.script || char_block.script;
           candidate.version = m.version || char_block.version;
           if(candidate.instance) {
-            candidate.instance.kill();
+            
+            softkill_block(candidate);
+            candidate.connected = false;//TODO i need to refractor lifecycle management
           } else {
+            candidate.connected = false;
             start_char(new_char_name);
           }
           break;
         case "shutdown":
+          console.log("shutdown requested from " + char_name)
           char_block.enabled = false;
-          result.kill();
+          softkill_block(char_block);
           break;
         case "cm":
           let recipients = m.to;
@@ -209,14 +246,14 @@ function patch_writing(strim) {
           const [locs,globs] = partition(recipients,
             x=>character_manage[x] && character_manage[x].connected);
           if(globs.length > 0) {
-            safe_send(char_block,{
+            safe_send(char_block.instance,{
               type:"send_cm",
               to:globs,
               data:m.data
             });
           }
           locs.forEach(blk=>{
-            safe_send(character_manage[blk],{
+            safe_send(character_manage[blk].instance,{
               type:"receive_cm",
               name:char_name,
               data:m.data
@@ -255,7 +292,7 @@ function patch_writing(strim) {
                 sessionStorage.forEach(
                   (value, key)=>catchup_data[key]=value);
               }
-              safe_send(char_block,{
+              safe_send(char_block.instance,{
                 type:"stor",
                 op:"set",
                 ident:m.ident,
@@ -270,7 +307,7 @@ function patch_writing(strim) {
             Object.values(character_manage)
               .filter(x=>x.instance)
               .forEach(block=>{
-                safe_send(block,m);
+                safe_send(block.instance,m);
               });
           }
           break;
@@ -284,6 +321,17 @@ function patch_writing(strim) {
     
     return result;
   }
+  //TODO beta new logic for #5
+  //i need to implement decent lifecycle-handling
+  ['SIGINT', 'SIGTERM', 'SIGQUIT']
+  .forEach(signal => process.on(signal, async () => {
+    console.log(`Received ${signal} on master. Rounding up clients`);
+    //softkill all chars, giving them chance to shutdown
+    await Promise.all(Object.values(character_manage).map(
+            char_block => {char_block.enabled = false; return softkill_block(char_block)}));
+    console.log("now truly exiting");
+    process.exit();
+  }));
   
   const tasks = Object.keys(character_manage).forEach(c_name=>{
     const char = character_manage[c_name];
