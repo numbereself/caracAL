@@ -7,7 +7,6 @@
 /localStorage/*
 !/localStorage/README.md
 .idea/
-/package-lock.json
 /CODE/*
 !/CODE/README.md
 !/CODE/caracAL/
