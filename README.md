@@ -2,6 +2,10 @@
 
 A Node.js client for [adventure.land](https://adventure.land/ "Adventure Land")
 
+### Changelog for 2023-02-01
+
+Fix a bug where parent.X may be empty when starting new characters.
+
 ### Changelog for 2022-10-24
 
 Add support for graceful shutdown. This enables the client function on_destroy to be called before a client is regenerated (shutdown as well as server switches).
@@ -126,6 +130,7 @@ caracAL runs the same files as the regular client. You can use the same scripts 
 
 Keep in mind that some functionality does not make sense in a headless client. This notably concerns the lack of a HTML document and a renderer.
 Most HTML routines do not throw an error, but do not expect them to do anything. Calls to PIXI routines should really be mostly avoided.
+If you want to implement HTML or PIXI functionality, check that `parent.no_graphics` is set to false. caracAL sets this to true.
 
 ### It is fast
 
