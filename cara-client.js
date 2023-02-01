@@ -104,11 +104,25 @@ async function make_runner(upper,CODE_file,version) {
       type: "shutdown"
     });
   }));
+
+  //awaits the arrival of a message from parent process
+  //indicating the servers_and_characters proxy that we use
+  const connected_signoff = new Promise((resolve) => {
+    process.on("message", (m) => {
+      switch (m.type) {
+        case "siblings_and_acc":
+          resolve();
+          break;
+      }
+    });
+  });
   
   process.send({type: "connected"});
   
   console.log("runner instance constructed");
   monitoring_util.register_stat_beat(upper);
+  //Fix a bug where parent.X is initially empty
+  await connected_signoff;
   await ev_files([CODE_file],runner_context);
   //TODO put a process end handler here
   
