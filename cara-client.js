@@ -198,7 +198,10 @@ async function make_game(version,addr,port,sess,cid,script_file,enable_map) {
   }
   //call_code_function("trigger_character_event","cm",{name:data.name,message:JSON.parse(data.message)});
 
-  vm.runInContext("add_log = console.log",game_context);
+  vm.runInContext(
+    `add_log = function(message) {console.log(character ? character.name : "Unknown", '|', message);}`,
+    game_context
+  );
   vm.runInContext("show_json = function(json) {console.log('show_json',json);}",game_context);
   process.send({type: "initialized"});
   process.on("message", (m) => {
