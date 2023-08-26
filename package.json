@@ -9,15 +9,15 @@
   "author": "number_e",
   "license": "MIT",
   "dependencies": {
-    "bot-web-interface": "^2.0.9",
-    "inquirer": "^8.0.0",
-    "jquery": "^3.6.0",
-    "jsdom": "^16.5.3",
+    "bot-web-interface": "^2.0.10",
+    "inquirer": "^8.2.6",
+    "jquery": "^3.7.0",
+    "jsdom": "^16.7.0",
     "json-storage-fs": "^2.0.2",
-    "logrotate-stream": "^0.2.8",
-    "node-fetch": "^2.6.1",
+    "logrotate-stream": "^0.2.9",
+    "node-fetch": "^2.7.0",
     "pngjs": "^6.0.0",
     "pretty-ms": "^7.0.1",
-    "socket.io-client": "^4.2.0"
+    "socket.io-client": "^4.7.2"
   }
 }
