@@ -8,7 +8,7 @@ class FileStoredKeyValues {
   #handle;
   #refactorTask;
 
-  constructor(main_path = "garage.jsonl", replacer_path = "garage.new.jsonl") {
+  constructor(main_path = "garage.jsonl", replacer_path = "garage.new.jsonl", refactor_interval = 30e3) {
     if(main_path === replacer_path) {
       throw new Error(`Please choose different main path and replacer path: ${main_path}`);
     }
@@ -16,7 +16,7 @@ class FileStoredKeyValues {
     this.#replacer_path = replacer_path;
     this.#backend = new Map();
     this.#initializeHandle();
-    this.#refactorTask = setInterval(()=>this.refactor(), 300e3);
+    this.#refactorTask = setInterval(()=>this.refactor(), refactor_interval);
   }
 
   #checkFileExistence(path) {
