@@ -231,9 +231,18 @@ function migrate_old_storage(path, localStorage) {
           }
           break;
         case "shutdown":
+          
+          if(m.character){
+            const candidate = character_manage[m.character] || {};
+
+            console.log(`shutdown requested for ${m.character} from ${char_name}`)
+            candidate.enabled = false;
+            softkill_block(candidate);
+          } else {
           console.log("shutdown requested from " + char_name)
           char_block.enabled = false;
           softkill_block(char_block);
+          }
           break;
         case "cm":
           let recipients = m.to;

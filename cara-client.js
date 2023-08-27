@@ -159,9 +159,10 @@ async function make_game(version,addr,port,sess,cid,script_file,enable_map) {
       });
     
   }
-  extensions.shutdown = function() {
+  extensions.shutdown = function(char_name) {
     process.send({
-      type: "shutdown"
+      type: "shutdown",
+      character: char_name
     });
   }
   extensions.map_enabled = function() {
