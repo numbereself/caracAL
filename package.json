@@ -16,6 +16,7 @@
     "json-storage-fs": "^2.0.2",
     "logrotate-stream": "^0.2.9",
     "node-fetch": "^2.7.0",
+    "pino": "^8.15.0",
     "pngjs": "^6.0.0",
     "pretty-ms": "^7.0.1",
     "socket.io-client": "^4.7.2"
