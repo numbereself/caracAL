@@ -1,4 +1,6 @@
 /caracAL.log*
+/logs/*
+!/logs/README.md
 /config.js
 /caracAL.service
 /node_modules/
