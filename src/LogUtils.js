@@ -3,7 +3,7 @@ const os = require("os");
 const crypto = require("crypto");
 const pino = require('pino');
 const { Writable } = require('stream');
-const { Console } = require('console');
+const console = require('console');
 const { resolve } = require("path");
 const util = require('node:util'); 
 
@@ -24,11 +24,17 @@ function get_git_revision() {
   }
 }
 
-const log = pino({
+let config = null;
+try {
+  config = require("../config");
+} catch(err) {} 
+let level = config ? (config.log_level || "info") : "silent";
+
+let log = pino({
   base:{"id":process_hash
     ,"type":"unspecified"},
-  level:"info"//you want some more logging, this is the line where we filter.
-})
+  level
+});
 
 log.warn({"type": "log_init"
   , "pid": process.pid
@@ -52,7 +58,14 @@ class NullWritableStream extends Writable {
 }
 
 function fakePinoConsole(baseLogger) {
-  const result = new Console(new NullWritableStream());
+  //if no config exists we do not provide structured logging
+  if(baseLogger == null) {
+    if(!config) {
+      return console;
+    }
+    baseLogger = log;
+  }
+  const result = new console.Console(new NullWritableStream());
 
   const console_levels_to_pino = {
     "debug":"debug",
@@ -89,4 +102,8 @@ const ctype_to_clid = {
   , "mage":7
 }
 
-module.exports = {log, fakePinoConsole, ctype_to_clid};
+module.exports = {
+  get log() { return log; }
+  , set log(val) { return log = val; }
+  , get console() { return fakePinoConsole(); }
+  , fakePinoConsole, ctype_to_clid};
