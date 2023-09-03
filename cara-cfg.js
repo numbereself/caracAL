@@ -122,6 +122,30 @@ If you want max performance you should choose no.`,
     }
   ]);
   //console.log({realm,use_bwi,use_minimap,port});
+
+
+
+  const conf_object = {
+    session:session, 
+    cull_versions:true,
+    web_app:{
+      enable_bwi:use_bwi,
+      enable_minimap:use_minimap || false,
+      expose_CODE:false,
+      port:port || 924
+    },
+    characters:all_chars.reduce((acc, c_name, i) => {
+      acc[c_name] = {
+        realm:realm,
+        script:"caracAL/examples/crabs.js",
+        enabled:enabled_chars.includes(i),
+        version:0
+      };
+      return acc;
+    }, {})
+  };
+
+
   function make_cfg_string() {
     return `
 //DO NOT SHARE THIS WITH ANYONE
@@ -160,7 +184,67 @@ module.exports = {
   await fs.writeFile('./config.js', make_cfg_string());
 }
 
+const fallback = (first, second) => JSON.stringify((first !== undefined) ? first : second); 
 
+function make_cfg_string(conf_object = {}) {
+  const ezpz = (key, substitute) => `${key.split(".").pop()}:${fallback
+    (key.split(".").reduce((prev,curr)=>(prev == undefined) ? undefined : prev[curr], conf_object), substitute)}`
+  const characters = conf_object.characters || {
+    Wizard:{
+      realm:"EUPVP",
+      script:"caracAL/examples/crabs.js",
+      enabled:true,
+      version:0
+    },
+    MERC:{
+      realm:"USIII",
+      script:"caracAL/tests/deploy_test.js",
+      enabled:true,
+      version:"halflife3"
+    },
+    GG:{
+      realm:"ASIAI",
+      script:"caracAL/tests/cm_test.js",
+      enabled:false,
+      version:0
+    }
+  };
+  return `
+//DO NOT SHARE THIS WITH ANYONE
+//the session key can be used to take over your account
+//and I would know.(<3 u Nex)
+module.exports = {
+  //to obtain a session: show_json(parent.user_id+"-"+parent.user_auth)
+  //or just delete the config file and restart caracAL
+  ${ezpz("session", "1111111111111111-abc123ABCabc123ABCabc")}, 
+  //delete all versions except the two latest ones
+  ${ezpz("cull_versions", true)},
+  web_app:{
+    //enables the monitoring dashboard
+    ${ezpz("web_app.enable_bwi", false)},
+    //enables the minimap in dashboard
+    //setting this to true implicitly
+    //enables the dashboard
+    ${ezpz("web_app.enable_minimap", false)},
+    //exposes the CODE directory
+    //useful i.e. if you want to
+    //load your code outside of caracAL
+    ${ezpz("web_app.expose_CODE", false)},
+    //which port to run webservices on
+    ${ezpz("web_app.port", 924)}
+  },
+  characters:{
+${Object.entries(characters)
+    .map(([cname, cconf]) => `    ${JSON.stringify(cname)}:{
+      realm:${fallback(cconf.realm, "EUI")},
+      script:${fallback(cconf.script, "caracAL/examples/crabs.js")},
+      enabled:${fallback(cconf.enabled, false)},
+      version:${fallback(cconf.version, 0)}
+    }`).join(",\n")}
+  }
+};
+`;
+}
 
 async function interactive() {
   try {
@@ -175,7 +259,4 @@ async function interactive() {
   }
 }
 
-exports.interactive = interactive;
-exports.prompt_new_cfg = prompt_new_cfg;
-//interactive();
-//prompt_new_cfg();
+exports = {interactive, prompt_new_cfg};
