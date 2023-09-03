@@ -84,6 +84,7 @@ async function prompt_new_cfg() {
   my_acc.auto_update = false;
   const all_realms = my_acc.response.servers.map(x=>x.key);
   const all_chars = my_acc.response.characters.map(x=>x.name);
+  my_acc.destroy();
   const yesno_choice = [{value:true,name:"Yes"},{value:false,name:"No"}];
   const enabled_chars = await prompt_chars(all_chars);
   if(enabled_chars.length <= 0) {
@@ -123,11 +124,14 @@ If you want max performance you should choose no.`,
   ]);
   //console.log({realm,use_bwi,use_minimap,port});
 
-
-
   const conf_object = {
     session:session, 
     cull_versions:true,
+    log_level:"info",
+    log_sinks: [
+      ["node", "./node_modules/logrotate-stream/bin/logrotate-stream", "./logs/caracAL.log.jsonl", "--keep", "3", "--size", "1500000"]
+      , ["node", "./standalones/LogPrinter.js"]
+    ],
     web_app:{
       enable_bwi:use_bwi,
       enable_minimap:use_minimap || false,
@@ -145,46 +149,10 @@ If you want max performance you should choose no.`,
     }, {})
   };
 
-
-  function make_cfg_string() {
-    return `
-//DO NOT SHARE THIS WITH ANYONE
-//the session key can be used to take over your account
-//and I would know.(<3 u Nex)
-module.exports = {
-  //to obtain a session: show_json(parent.user_id+"-"+parent.user_auth)
-  //or just delete the config file and restart caracAL
-  session:"${session}", 
-  //delete all versions except the two latest ones
-  cull_versions:true,
-  web_app:{
-    //enables the monitoring dashboard
-    enable_bwi:${use_bwi},
-    //enables the minimap in dashboard
-    //setting this to true implicitly
-    //enables the dashboard
-    enable_minimap:${use_minimap || false},
-    //exposes the CODE directory
-    //useful i.e. if you want to
-    //load your code outside of caracAL
-    expose_CODE:false,
-    port:${port || 924}
-  },
-  characters:{${all_chars.map((c_name,i) => `
-    ${c_name}:{
-      realm:"${realm}",
-      script:"caracAL/examples/crabs.js",
-      enabled:${enabled_chars.includes(i)},
-      version:0
-    },`).join("")}
-  }
-};
-    `;
-  }
-  await fs.writeFile('./config.js', make_cfg_string());
+  await fs.writeFile('./config.js', make_cfg_string(conf_object));
 }
 
-const fallback = (first, second) => JSON.stringify((first !== undefined) ? first : second); 
+const fallback = (first, second) => JSON.stringify((first !== undefined) ? first : second, null, 2); 
 
 function make_cfg_string(conf_object = {}) {
   const ezpz = (key, substitute) => `${key.split(".").pop()}:${fallback
@@ -209,8 +177,7 @@ function make_cfg_string(conf_object = {}) {
       version:0
     }
   };
-  return `
-//DO NOT SHARE THIS WITH ANYONE
+  return `//DO NOT SHARE THIS WITH ANYONE
 //the session key can be used to take over your account
 //and I would know.(<3 u Nex)
 module.exports = {
@@ -219,6 +186,16 @@ module.exports = {
   ${ezpz("session", "1111111111111111-abc123ABCabc123ABCabc")}, 
   //delete all versions except the two latest ones
   ${ezpz("cull_versions", true)},
+  //how much logging you want
+  //set to "debug" for more logging and "warn" for less logging
+  ${ezpz("log_level", "info")},
+  //where to log to
+  //the lines are commands which use stdin stream and write it somwehere
+  //default is a logrotate file and colorful stdout formatting
+  ${ezpz("log_sinks", [
+    ["node", "./node_modules/logrotate-stream/bin/logrotate-stream", "./logs/caracAL.log.jsonl", "--keep", "3", "--size", "1500000"]
+    , ["node", "./standalones/LogPrinter.js"]
+  ])},
   web_app:{
     //enables the monitoring dashboard
     ${ezpz("web_app.enable_bwi", false)},
@@ -259,4 +236,4 @@ async function interactive() {
   }
 }
 
-exports = {interactive, prompt_new_cfg};
+module.exports = {interactive, prompt_new_cfg, make_cfg_string};
