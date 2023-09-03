@@ -1,15 +1,13 @@
-const child_process = require("child_process");
-const account_info = require("./account_info");
-const game_files = require("./game_files");
-const log_rotor = require('logrotate-stream');
-const log_stream = log_rotor({ file: './caracAL.log', size: 1500000, keep: 3 });
-const ConfigUtil = require("./src/ConfigUtil");
+const child_process = require("node:child_process");
+const account_info = require("../account_info");
+const game_files = require("../game_files");
 const bwi = require("bot-web-interface");
-const monitoring_util = require("./monitoring_util");
+const monitoring_util = require("../monitoring_util");
 const express = require('express');
 const fs_regular = require('node:fs');
+const { LOCALSTORAGE_PATH, LOCALSTORAGE_ROTA_PATH } = require("../src/CONSTANTS")
 
-const FileStoredKeyValues = require("./src/FileStoredKeyValues");
+const FileStoredKeyValues = require("../src/FileStoredKeyValues");
 
 //TODO check for invalid session
 //TODO improve termination
@@ -53,11 +51,8 @@ function migrate_old_storage(path, localStorage) {
 }
 
 (async () => {
-  await ConfigUtil.interactive();
-  patch_writing(process.stdout);
-  patch_writing(process.stderr);
   
-  const localStorage = new FileStoredKeyValues("./localStorage/caraGarage.jsonl","./localStorage/caraGarage.other.jsonl");
+  const localStorage = new FileStoredKeyValues(LOCALSTORAGE_PATH,LOCALSTORAGE_ROTA_PATH);
 
   //migrate from old library which stored everything in single file
   migrate_old_storage("./localStorage/storage.json", localStorage);
@@ -69,7 +64,7 @@ function migrate_old_storage(path, localStorage) {
 
   const version = await game_files.ensure_latest();
 
-  const cfg = require("./config");
+  const cfg = require("../config");
   if(cfg.cull_versions) {
     await game_files.cull_versions([version]);
   }
