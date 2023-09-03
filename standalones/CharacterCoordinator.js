@@ -6,6 +6,7 @@ const monitoring_util = require("../monitoring_util");
 const express = require('express');
 const fs_regular = require('node:fs');
 const { LOCALSTORAGE_PATH, LOCALSTORAGE_ROTA_PATH } = require("../src/CONSTANTS")
+const { log } = require("../src/LogUtils");
 
 const FileStoredKeyValues = require("../src/FileStoredKeyValues");
 
@@ -24,20 +25,12 @@ function partition(a, fun) {
   return ret;
 }
 
-function patch_writing(strim) {
-  const orig = strim.write.bind(strim);
-  const alt = log_stream.write.bind(log_stream);
-  strim.write = function(chunk, encoding, callback) {
-    orig(chunk,encoding,callback);
-    alt(chunk,encoding,callback);
-  }
-}
-
 function migrate_old_storage(path, localStorage) {
   let file_contents;
   try {
     file_contents = fs_regular.readFileSync(path,"utf8");
   } catch(err) {
+    log.info({type:"ls_migration_none", path},"localStorage migration unnecessary");
     return;
   }
   if(file_contents.length > 0) {
@@ -45,8 +38,10 @@ function migrate_old_storage(path, localStorage) {
     for(let [key, value] of json_object) {
       localStorage.set(key, value);
     }
+    log.info({type:"ls_migration", path, value:Object.keys(json_object).length},"localStorage migrated");
   }
   fs_regular.unlinkSync(path);
+  log.info({type:"ls_migration_done", path},"old localStorage deleted");
   return;
 }
 
