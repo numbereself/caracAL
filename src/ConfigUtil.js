@@ -192,6 +192,8 @@ module.exports = {
   //where to log to
   //the lines are commands which use stdin stream and write it somwehere
   //default is a logrotate file and colorful stdout formatting
+  //advanced linuxers: keep in mind that file redirects (>) and pipes (|) are a shell feature
+  //so if you wanna use them you have to prefix your command with "bash", "-c"
   ${ezpz("log_sinks", [
     ["node", "./node_modules/logrotate-stream/bin/logrotate-stream", "./logs/caracAL.log.jsonl", "--keep", "3", "--size", "1500000"]
     , ["node", "./standalones/LogPrinter.js"]

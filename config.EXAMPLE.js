@@ -13,6 +13,8 @@ module.exports = {
   //where to log to
   //the lines are commands which use stdin stream and write it somwehere
   //default is a logrotate file and colorful stdout formatting
+  //advanced linuxers: keep in mind that file redirects (>) and pipes (|) are a shell feature
+  //so if you wanna use them you have to prefix your command with "bash", "-c"
   log_sinks:[
   [
     "node",
