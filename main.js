@@ -3,7 +3,7 @@ const account_info = require("./account_info");
 const game_files = require("./game_files");
 const log_rotor = require('logrotate-stream');
 const log_stream = log_rotor({ file: './caracAL.log', size: 1500000, keep: 3 });
-const cara_cfg = require("./src/InteractiveConfigCreator");
+const ConfigUtil = require("./src/ConfigUtil");
 const bwi = require("bot-web-interface");
 const monitoring_util = require("./monitoring_util");
 const express = require('express');
@@ -53,7 +53,7 @@ function migrate_old_storage(path, localStorage) {
 }
 
 (async () => {
-  await cara_cfg.interactive();
+  await ConfigUtil.interactive();
   patch_writing(process.stdout);
   patch_writing(process.stderr);
   
