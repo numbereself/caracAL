@@ -1,7 +1,7 @@
 'use strict';
 var inquirer = require('inquirer');
 const fetch = require('node-fetch');
-const account_info = require("./account_info");
+const account_info = require("../account_info");
 const fs = require("fs").promises;
 const { constants } = require('fs');
 
