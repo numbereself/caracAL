@@ -35,7 +35,7 @@ function migrate_old_storage(path, localStorage) {
   }
   if(file_contents.length > 0) {
     const json_object = JSON.parse(file_contents);
-    for(let [key, value] of json_object) {
+    for(let [key, value] of Object.entries(json_object)) {
       localStorage.set(key, value);
     }
     log.info({type:"ls_migration", path, value:Object.keys(json_object).length},"localStorage migrated");

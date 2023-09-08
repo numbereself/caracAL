@@ -20,6 +20,8 @@ function get_git_revision() {
         return fs.readFileSync('.git/' + rev.substring(5)).toString().trim();
     }
   } catch(err) {
+    //did you know that windows still cant display unicode in console?
+    //but tbf, this shouldnt even happen.
     return "🤷‍♂️"
   }
 }
