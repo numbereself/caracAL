@@ -61,11 +61,8 @@ class NullWritableStream extends Writable {
 
 function fakePinoConsole(baseLogger) {
   //if no config exists we do not provide structured logging
-  if(baseLogger == null) {
-    if(!config) {
-      return console;
-    }
-    baseLogger = log;
+  if(baseLogger == null && !config) {
+    return console;
   }
   const result = new console.Console(new NullWritableStream());
 
@@ -79,16 +76,15 @@ function fakePinoConsole(baseLogger) {
   const fallback_level = "info";
   
   for(let key of Object.keys(result)) {
-    const sub_logger = baseLogger.child({ type:"console",func: key });
     const mapped_pino_level = console_levels_to_pino[key];
     result[key] = mapped_pino_level 
       ? function (template, ...args) {
-        sub_logger[mapped_pino_level]
-            ({"args":args}, util.format(template, ...args)) 
+        (baseLogger || log)[mapped_pino_level]
+            ({type:"console",func: key,"args":args}, util.format(template, ...args)) 
         }
       : function (...args) {
-        sub_logger[fallback_level]
-          ({"args":args});
+        (baseLogger || log)[fallback_level]
+          ({type:"console",func: key,"args":args});
     }
   }
   return result;
