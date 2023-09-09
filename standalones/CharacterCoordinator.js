@@ -6,7 +6,7 @@ const monitoring_util = require("../monitoring_util");
 const express = require('express');
 const fs_regular = require('node:fs');
 const { LOCALSTORAGE_PATH, LOCALSTORAGE_ROTA_PATH } = require("../src/CONSTANTS")
-const { log, console } = require("../src/LogUtils");
+const { log, console, ctype_to_clid } = require("../src/LogUtils");
 
 const FileStoredKeyValues = require("../src/FileStoredKeyValues");
 
@@ -167,6 +167,7 @@ function migrate_old_storage(path, localStorage) {
       realm = default_realm;
     }
     const char = my_acc.resolve_char(char_name);
+    //class is char.type
     if(!char) {
       console.error(`could not resolve character ${char_name}`,
         `this character will not be started`);
@@ -178,7 +179,7 @@ function migrate_old_storage(path, localStorage) {
     console.log(`starting ${char_name} running version ${g_version} in ${char_block.realm}`);
     
     const args = [g_version,realm.addr,realm.port,sess,char.id,
-       char_block.script, cfg.web_app && cfg.web_app.enable_minimap && "yesmap" || "nomap"];
+       char_block.script, cfg.web_app && cfg.web_app.enable_minimap && "yesmap" || "nomap", char_name, ctype_to_clid[char.type] || -1];
     const result = child_process.fork("./src/CharacterThread.js",args,
       {stdio: ["ignore", "pipe", "pipe", 'ipc']});
     result.stdout.pipe(process.stdout);
