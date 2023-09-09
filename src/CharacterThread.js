@@ -237,7 +237,6 @@ async function make_game(version,addr,port,sess,cid,script_file,enable_map) {
 }
 
 async function caracal_start() {
-  console.debug = function(){};
   let args = process.argv.slice(2);
   const version = args[0];
   const realm_addr = args[1];
