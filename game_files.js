@@ -6,6 +6,7 @@ const {promisify} = require('util');
 const streamPipeline = promisify(pipeline);
 const fetch = require('node-fetch');
 const path = require('path');
+const { console } = require("./src/LogUtils");
 
 function get_runner_files() {
   return [

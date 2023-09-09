@@ -7,6 +7,7 @@ const express = require('express');
 const fs_regular = require('node:fs');
 const { LOCALSTORAGE_PATH, LOCALSTORAGE_ROTA_PATH } = require("../src/CONSTANTS")
 const { log } = require("../src/LogUtils");
+const { console } = require("./src/LogUtils");
 
 const FileStoredKeyValues = require("../src/FileStoredKeyValues");
 
@@ -24,6 +25,9 @@ function partition(a, fun) {
       ret[1].push(a[i]);
   return ret;
 }
+
+//note to self: how to promisify event emitter(once)
+//const someAsyncFunction = util.promisify(myEmitter.once).bind(myEmitter);
 
 function migrate_old_storage(path, localStorage) {
   let file_contents;

@@ -8,7 +8,6 @@ function spawn_sink(command, ...args) {
     return fork(args[0],args.slice(1),
       {stdio: ["pipe", "inherit", "inherit", "ipc"]});
   } else {
-    console.log(command);
     return spawn(command,args,
       {stdio: ["pipe", "inherit", "inherit", "ipc"]});
   }
