@@ -6,8 +6,7 @@ const monitoring_util = require("../monitoring_util");
 const express = require('express');
 const fs_regular = require('node:fs');
 const { LOCALSTORAGE_PATH, LOCALSTORAGE_ROTA_PATH } = require("../src/CONSTANTS")
-const { log } = require("../src/LogUtils");
-const { console } = require("./src/LogUtils");
+const { log, console } = require("../src/LogUtils");
 
 const FileStoredKeyValues = require("../src/FileStoredKeyValues");
 
