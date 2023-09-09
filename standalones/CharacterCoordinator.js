@@ -179,7 +179,7 @@ function migrate_old_storage(path, localStorage) {
     
     const args = [g_version,realm.addr,realm.port,sess,char.id,
        char_block.script, cfg.web_app && cfg.web_app.enable_minimap && "yesmap" || "nomap"];
-    const result = child_process.fork("./cara-client.js",args,
+    const result = child_process.fork("./src/CharacterThread.js",args,
       {stdio: ["ignore", "pipe", "pipe", 'ipc']});
     result.stdout.pipe(process.stdout);
     result.stderr.pipe(process.stderr);

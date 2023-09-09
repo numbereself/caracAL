@@ -4,10 +4,10 @@ const io = require("socket.io-client");
 const fs = require('fs').promises;
 const { JSDOM } = require( "jsdom" );
 const node_query = require('jquery');
-const game_files = require("./game_files");
+const game_files = require("../game_files");
 const fetch = require('node-fetch');
-const monitoring_util = require("./monitoring_util");
-const ipc_storage = require("./ipcStorage");
+const monitoring_util = require("../monitoring_util");
+const ipc_storage = require("../ipcStorage");
 
 process.on('unhandledRejection', function (exception) {
   console.warn("promise rejected: \n",exception);
