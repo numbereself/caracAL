@@ -33,8 +33,7 @@ try {
 let level = config ? (config.log_level || "info") : "silent";
 
 let log = pino({
-  base:{"id":process_hash
-    ,"type":"unspecified"},
+  base:{"id":process_hash},
   level
 });
 

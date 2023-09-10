@@ -41,7 +41,7 @@ const messageFormat = (log_object, messageKey) => {
     : ("val" in log_object)
       ? " = " + (msg_colors ? msg_colors(val) : val)
       : ""
-    return `${id} ${char_string} ${type}${func ? `.${func}()` : ""}${message_string}`;
+    return `${id} ${char_string} ${("type" in log_object) ? type : "unspecified"}${func ? `.${func}()` : ""}${message_string}`;
   } 
 
 const opts = {
