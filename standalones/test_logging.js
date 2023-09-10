@@ -36,6 +36,7 @@ log.info({type:"big if true", col: "bold"}, "im dummy thicc")
 
 log.info({type:"node executable location", val:process.execPath});
 
+log.info({type:"what happens if msg is an object?", col:"green"}, {hallo:"welt"});
 
 const conn = fakePinoConsole(log);
 

@@ -206,8 +206,19 @@ async function make_game(version,addr,port,sess,cid,script_file,enable_map) {
   }
   //call_code_function("trigger_character_event","cm",{name:data.name,message:JSON.parse(data.message)});
 
-  vm.runInContext('add_log = function(msg, col) {caracAL.log.info({col:col, data:msg, type:"AL", func:"add_log"});}',game_context);
-  //show_json causes a popus so it must be important
+  vm.runInContext(`
+  (function() {
+    const old_add_log = add_log; 
+    add_log = function(msg, col) {
+      old_add_log(msg,col);
+      for(let [msg, col] of game_logs) {
+        caracAL.log.info({col:col, type:"game_logs"}, msg);
+      }
+      game_logs = [];
+    }
+  })();
+  `,game_context);
+  //show_json causes a popup so it must be important
   //therefore we use warn level here
   vm.runInContext('show_json = function(json) {caracAL.log.warn({data:json, type:"AL", func:"show_json"});}',game_context);
   process.send({type: "initialized"});
