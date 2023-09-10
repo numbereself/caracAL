@@ -2,29 +2,33 @@
 
 A Node.js client for [adventure.land](https://adventure.land/ "Adventure Land")
 
-### Changelog for 2023-02-01
+## Recent Versions
 
-Fix a bug where parent.X may be empty when starting new characters.
+### Better 🌲 __logging__
 
-### Changelog for 2022-10-24
+#### 2023-09-09
 
-Add support for graceful shutdown. This enables the client function on_destroy to be called before a client is regenerated (shutdown as well as server switches).
-The calculations have a 500 ms window, after which they will be force terminated.
+##### npm install required
 
-### Changelog for 2022-09-27
+##### BREAKING CHANGES
 
-Fixes for storage.json sometimes being completely empty.
-If caracAL worked for you and you werent getting `Unexpected end of JSON input` you dont need to update.
+This update updates the internal logging to use JSON format powered by [pino](https://www.npmjs.com/package/pino "the logging framework pino").
 
-### Changelog for 2022-09-08
+This enables significantly better formatting of console output, including which character sent a log and colored logs.
 
-Minor bugfixes with a larger impact.
-smart_move should now be usable again.
-Also special characters are now respected in login process
+The logfiles were moved into a separate logs folder but are still subject to logrotate.
 
-## IMPORTANT! Changes from 2021-10-17
+For more details see the README about [🌲Logging](./README.md#🌲logging "logging section of README.md").
 
-This update finally introduces localStorage and sessionStorage. However, in order to provide these technologies we need to bring in additional dependencies. Follow the steps below to upgrade to the most recent version. This version renames the default scripts. The default code file `example.js` now resides in `caracAL/examples/crabs.js`. If you were running the default crab script please edit or regenerate your config file in order to match the changed filename. 
+Also, I updated localStorage.
+
+It is no longer stored as a single json file but as newline-delimited json (ndjson/jsonl) with one key per line.
+The filename is now `localStorage/caraGarage.jsonl`.
+Existing localStorage should get migrated automatically.
+
+Large files should no longer lock up the application, but it will take more storage space in the process.
+
+Behind the scenes I have done a lot of refactoring to make the codebase more maintainable. I will continue to do so as I add new features.
 
 ### Upgrading from a git installation
 
@@ -38,6 +42,10 @@ npm install
 ### Simpler version
 
 Simply reinstall caracAL by following the steps below. You can keep the config.js file from your old installation for ease of use.
+
+### Full Changelog
+
+The full changelog that used to be here has moved to [CHANGELOG.md](./CHANGELOG.md "the CHANGELOG.md file")
 
 ## Installation on Debian/Ubuntu
 
@@ -102,6 +110,10 @@ The session key represents you login into adventure.land. This is the reason why
 caracAL stores versions of the game client on your disk, in the game_files folder.
 If set, the cull_versions key makes caracAL delete these versions, except the two most recent ones.
 Versions which are not numeric will not be considered for culling.
+
+log_level specifies how much logging you want. For more details refer to section [log_level](./README.md#log_level "log_level").
+
+log_sinks specifies where your logging goes. More details in the section [log_sinks](./README.md#log_sinks "log_sinks").
 
 The web_app section contains configuration that enables caracAL to host a webserver. The port option herein allows to choose which port the webserver should be hosted on.
 The enable_bwi option opens a monitoring panel that displays the status of the characters running within caracAL if set to true.
@@ -175,6 +187,93 @@ The information available in `parent.X` is needed by the coordination part of ca
 Characters which disconnect or fail to connect in the first place will be automatically reloaded. If you want to prevent this behaviour call `parent.caracAL.shutdown()` within your code.
 
 If you are not comfortable storing a secret like your auth key plaintext in a file caracAL can read it from the process environment variables instead. Just set the environment var `AL_SESSION` to your session key and caracAL will use that instead.
+
+## 🌲Logging
+
+#### Motivation
+
+In previous versions of caracAL output from the characters and the coordinator was sent into a file and to the console unformatted.  
+This had some major drawbacks that I was willing to accept at the time because data streaming is hard.
+- It was impossible to know which character sent a log
+- Formatting with colors was impossible
+- The log could not easily be ingested into a TimeSeriesDB such as InfluxDB
+
+I finally tackled these by bringing in the logging Framework __🌲Pino__.
+
+#### Structured Logging
+
+In __🌲Pino__ every log message is a JSON object.  
+The entire log is a lot of newline-delimited JSON objects (ndjson/jsonl).  
+This allows us to store log metadata such as log time, which character logged it, log levels and colors.
+A typical log now looks like so:
+```json
+{"level":30,"time":1694346299637,"id":"SlMw","type":"unspecified","type":"console","func":"log","args":[],"msg":"updating account info"}
+{"level":30,"time":1694346299653,"id":"EwAR","type":"unspecified","cname":"CodeGorm","clid":"2","col":"gray","type":"game_logs","msg":"You killed a Tiny Crab"}
+{"level":30,"time":1694346299761,"id":"EwAR","type":"unspecified","cname":"CodeGorm","clid":"2","col":"gold","type":"game_logs","msg":"7 gold"}
+{"level":30,"time":1694346299955,"id":"SlMw","type":"unspecified","type":"console","func":"log","args":[],"msg":"found 8 servers and 8 characters"}
+```
+
+#### Integration into CODE
+
+caracAL overrides the `console.log(...)` etc, as well as `add_log(message, color)` as well as `show_json(json_object)` out of the box.  
+They will be wrapped into an appropriate JSON automatically.
+
+By default Adventure land does not support structured logging.  
+In order to explicitly access the structured logger you can use `parent.caracAL.log`.  
+The logging object is backed by pino. For example:
+```js
+parent.caracAL.log.warn({type:"answer to everything", col:"yellow"}, "it is 42");
+```
+For a more complete reference you can refer to [the pino API docs](https://github.com/pinojs/pino/blob/master/docs/api.md "the pino api docs")
+
+#### Supported Properties
+
+caracAL has a custom log formatter located in `./standalones/Logprinter.js`.  
+It supports the following automatic log properties:
+- level : which log level the message is on. more important messages are higher level
+- time : a unix timestamp (seconds sine 1970-01-01) when the message occurred.
+- id : a random generated char sequence to identify different threads.
+- cname : the character name that the event happened on
+- clid : an int representing which class the character is
+
+as well as the following custom (set by you) properties:
+- type : a user-defined identifier for the type of message. 
+- func : a user-defined identifier, which can be used in conjunction with type to further specify message origin.
+- col : which color to render msg or val in.  
+you can put anything in here but only the following will render in console:  
+`["gray", "red", "cyan", "magenta", "yellow", "green", "blue"]`
+- msg : a textual representation of the message you want to log.
+- val : if you dont want to log a message but rather a measurement you can use this.
+
+#### Log Configuration
+
+The new logging comes with two new configuration options that can be tweaked in config.js
+
+##### log_level
+
+This config option controls the level at which to log.  
+Messages that are a lower level than the one specified will be discarded.
+
+This option defaults to "info".  
+Things logged on debug level, such as console.debug, will be ignored on this level.
+
+You can change the level to "warn" for less logging or "debug" for more logging.
+
+##### log_sinks
+
+This config option controls where logs are written to.
+
+Each entry represents one console commmand, split into its separate arguments.
+
+The default behaviour is to log formatted output to the console with the command  
+`node ./standalones/LogPrinter.js`  
+as well as to a logrotated file in `./logs/caracAL.log.jsonl`:  
+`node ./node_modules/logrotate-stream/bin/logrotate-stream ./logs/caracAL.log.jsonl --keep 3 --size 1500000`  
+This is different from the old logfile located at `./caracAL.log`
+
+If you want to supply your own log destination, assume that there is jsonl-data being streamed on stdin.  
+If you are an an advanced linuxer you can specify the array `["bash" "-c" "command_you actually want to run > you_can_use_pipes"]`  
+Just keep in mind that you have to use json-escaping for specifying the command itself.
 
 ## localStorage and sessionStorage
 
