@@ -3,8 +3,9 @@ const os = require("os");
 const crypto = require("crypto");
 const pino = require('pino');
 const { Writable } = require('stream');
-const { Console } = require('console');
+const console = require('console');
 const { resolve } = require("path");
+const util = require('node:util'); 
 
 //3 byte random ident base64 to 4 characters
 //should suffice if you assume that instances arent changed often
@@ -19,23 +20,27 @@ function get_git_revision() {
         return fs.readFileSync('.git/' + rev.substring(5)).toString().trim();
     }
   } catch(err) {
+    //did you know that windows still cant display unicode in console?
+    //but tbf, this shouldnt even happen.
     return "🤷‍♂️"
   }
 }
 
-const logger = pino({
-  base:{"id":process_hash},
-  level:process.env.LOG_LEVEL || "info"
-  /*transport: {
-    target: 'pino-pretty',
-    options: {
-      colorize: true
-    }
-  }*/
-})
+let config = null;
+try {
+  config = require("../config");
+} catch(err) {} 
+let level = config ? (config.log_level || "info") : "silent";
 
-logger.warn({"type": "log_init"
+let log = pino({
+  base:{"id":process_hash},
+  level
+});
+
+log.warn({"type": "log_init"
   , "pid": process.pid
+  , "node_executable" : process.execPath
+  , "node_versions": process.versions
   , "cwd": resolve(".")
   , "hostname": os.hostname()
   , "os_release":os.release(), "os_platform":os.platform()
@@ -54,7 +59,11 @@ class NullWritableStream extends Writable {
 }
 
 function fakePinoConsole(baseLogger) {
-  const result = new Console(new NullWritableStream());
+  //if no config exists we do not provide structured logging
+  if(baseLogger == null && !config) {
+    return console;
+  }
+  const result = new console.Console(new NullWritableStream());
 
   const console_levels_to_pino = {
     "debug":"debug",
@@ -62,18 +71,36 @@ function fakePinoConsole(baseLogger) {
     "log":"info",
     "warn":"warn",
     "error":"error",
-    "_default":"info"
   }
+  const fallback_level = "info";
   
   for(let key of Object.keys(result)) {
-    const mapped_pino_level = console_levels_to_pino[key] 
-      || console_levels_to_pino["_default"];
-    result[key] = function (...args) {
-      baseLogger[mapped_pino_level]
-        ({"args":args, func:key, type:"console"});
+    const mapped_pino_level = console_levels_to_pino[key];
+    result[key] = mapped_pino_level 
+      ? function (template, ...args) {
+        (baseLogger || log)[mapped_pino_level]
+            ({type:"console",func: key,"args":args}, util.format(template, ...args)) 
+        }
+      : function (...args) {
+        (baseLogger || log)[fallback_level]
+          ({type:"console",func: key,"args":args});
     }
   }
   return result;
 }
 
-module.exports = {logger, fakePinoConsole};
+const ctype_to_clid = {
+  "merchant":1
+  , "warrior":2
+  , "paladin":3
+  , "priest":4
+  , "ranger":5
+  , "rogue":6
+  , "mage":7
+}
+
+module.exports = {
+  get log() { return log; }
+  , set log(val) { return log = val; }
+  , get console() { return fakePinoConsole(); }
+  , fakePinoConsole, ctype_to_clid};

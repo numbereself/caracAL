@@ -1,4 +1,5 @@
 const fetch = require('node-fetch');
+const { console } = require("./src/LogUtils");
 class Info {
   constructor() {
     

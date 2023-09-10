@@ -4,10 +4,13 @@ const io = require("socket.io-client");
 const fs = require('fs').promises;
 const { JSDOM } = require( "jsdom" );
 const node_query = require('jquery');
-const game_files = require("./game_files");
+const game_files = require("../game_files");
 const fetch = require('node-fetch');
-const monitoring_util = require("./monitoring_util");
-const ipc_storage = require("./ipcStorage");
+const monitoring_util = require("../monitoring_util");
+const ipc_storage = require("../ipcStorage");
+
+const LogUtils = require("./LogUtils");
+const { console } = LogUtils;
 
 process.on('unhandledRejection', function (exception) {
   console.warn("promise rejected: \n",exception);
@@ -31,6 +34,7 @@ function make_context(upper = null) {
   result.fetch = fetch;
   result.$ = result.jQuery = node_query(result);
   result.require = require;
+  result.console = console;
   if(upper) {
     Object.defineProperty(result, "parent", {value: upper});
     result._localStorage = upper._localStorage;
@@ -148,6 +152,9 @@ async function make_game(version,addr,port,sess,cid,script_file,enable_map) {
   
   //expose the block under parent.caracAL
   const extensions = {};
+
+  extensions.log = LogUtils.log;
+
   extensions.deploy = function(char_name, realm, script_file, game_version) {
     
       process.send({
@@ -199,8 +206,21 @@ async function make_game(version,addr,port,sess,cid,script_file,enable_map) {
   }
   //call_code_function("trigger_character_event","cm",{name:data.name,message:JSON.parse(data.message)});
 
-  vm.runInContext("add_log = console.log",game_context);
-  vm.runInContext("show_json = function(json) {console.log('show_json',json);}",game_context);
+  vm.runInContext(`
+  (function() {
+    const old_add_log = add_log; 
+    add_log = function(msg, col) {
+      old_add_log(msg,col);
+      for(let [msg, col] of game_logs) {
+        caracAL.log.info({col:col, type:"game_logs"}, msg);
+      }
+      game_logs = [];
+    }
+  })();
+  `,game_context);
+  //show_json causes a popup so it must be important
+  //therefore we use warn level here
+  vm.runInContext('show_json = function(json) {caracAL.log.warn({data:json, type:"AL", func:"show_json"});}',game_context);
   process.send({type: "initialized"});
   process.on("message", (m) => {
     switch (m.type) {
@@ -228,7 +248,6 @@ async function make_game(version,addr,port,sess,cid,script_file,enable_map) {
 }
 
 async function caracal_start() {
-  console.debug = function(){};
   let args = process.argv.slice(2);
   const version = args[0];
   const realm_addr = args[1];
@@ -237,6 +256,10 @@ async function caracal_start() {
   const cid = args[4];
   const script_file = args[5];
   const enable_map = args[6]=="yesmap";
+  const cname = args[7];
+  const clid = args[8];
+  const new_log = LogUtils.log.child({cname, clid});
+  LogUtils.log = new_log;
   await make_game(version,realm_addr,realm_port,sess,cid, script_file,enable_map);
 }
 
