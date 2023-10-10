@@ -21,5 +21,8 @@
     "pngjs": "^6.0.0",
     "pretty-ms": "^7.0.1",
     "socket.io-client": "^4.7.2"
+  },
+  "devDependencies": {
+    "prettier": "3.0.3"
   }
 }
