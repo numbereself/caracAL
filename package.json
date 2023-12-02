@@ -9,7 +9,7 @@
   "author": "number_e",
   "license": "MIT",
   "dependencies": {
-    "bot-web-interface": "^2.0.10",
+    "bot-web-interface": "^2.0.14",
     "cloneable-readable": "^3.0.0",
     "inquirer": "^8.2.6",
     "jquery": "^3.7.0",
