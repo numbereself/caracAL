@@ -58,7 +58,7 @@ async function ev_files(locations, context) {
   }
 }
 
-async function make_runner(upper, CODE_file, version) {
+async function make_runner(upper, CODE_file, version, is_typescript) {
   const runner_sources = game_files
     .get_runner_files()
     .map((f) => game_files.locate_game_file(f, version));
@@ -83,10 +83,16 @@ async function make_runner(upper, CODE_file, version) {
   };
   //we need to do this here because of scoping
   upper.caracAL.load_scripts = async function (locations) {
-    return await ev_files(
-      locations.map((x) => "./CODE/" + x),
-      runner_context,
-    );
+    if (!is_typescript) {
+      return await ev_files(
+        locations.map((x) => "./CODE/" + x),
+        runner_context,
+      );
+    } else {
+      throw new Exception(
+        "Runtime Loading Code is not supported in Typescript Mode.\nUse an import instead",
+      );
+    }
   };
   vm.runInContext(
     "active = true;parent.code_active = true;set_message('Code Active');if (character.rip) character.trigger('death', {past: true});",
@@ -142,18 +148,10 @@ async function make_runner(upper, CODE_file, version) {
   return runner_context;
 }
 
-async function make_game(
-  version,
-  addr,
-  port,
-  sess,
-  cid,
-  script_file,
-  enable_map,
-) {
+async function make_game(proc_args) {
   const game_sources = game_files
     .get_game_files()
-    .map((f) => game_files.locate_game_file(f, version))
+    .map((f) => game_files.locate_game_file(f, proc_args.version))
     .concat(["./html_vars.js"]);
   console.log("constructing game instance");
   console.debug("source files:\n%s", game_sources);
@@ -162,11 +160,11 @@ async function make_game(
   game_context.bowser = {};
   await ev_files(game_sources, game_context);
   game_context.VERSION = "" + game_context.G.version;
-  game_context.server_addr = addr;
-  game_context.server_port = port;
-  game_context.user_id = sess.split("-")[0];
-  game_context.user_auth = sess.split("-")[1];
-  game_context.character_to_load = cid;
+  game_context.server_addr = proc_args.realm_addr;
+  game_context.server_port = proc_args.realm_port;
+  game_context.user_id = proc_args.sess.split("-")[0];
+  game_context.user_auth = proc_args.sess.split("-")[1];
+  game_context.character_to_load = proc_args.cid;
 
   //expose the block under parent.caracAL
   const extensions = {};
@@ -189,7 +187,7 @@ async function make_game(
     });
   };
   extensions.map_enabled = function () {
-    return enable_map;
+    return proc_args.enable_map;
   };
 
   game_context.caracAL = extensions;
@@ -198,11 +196,17 @@ async function make_game(
   game_context.new_game_logic = function () {
     old_ng_logic();
     clearTimeout(reload_task);
+    const is_typescript =
+      proc_args.typescript_file && proc_args.typescript_file.length > 0;
+    const target_script = is_typescript
+      ? "./TYPECODE.out/" + proc_args.typescript_file
+      : "./CODE/" + proc_args.script_file;
     (async function () {
       const runner_context = await make_runner(
         game_context,
-        "./CODE/" + script_file,
-        version,
+        target_script,
+        proc_args.version,
+        is_typescript,
       );
       extensions.runner = runner_context;
     })();
@@ -280,33 +284,20 @@ async function make_game(
   console.log("game instance constructed");
   return game_context;
 }
-
-async function caracal_start() {
-  let args = process.argv.slice(2);
-  const version = args[0];
-  const realm_addr = args[1];
-  const realm_port = args[2];
-  const sess = args[3];
-  const cid = args[4];
-  const script_file = args[5];
-  const enable_map = args[6] == "yesmap";
-  const cname = args[7];
-  const clid = args[8];
-  const new_log = LogUtils.log.child({ cname, clid });
-  LogUtils.log = new_log;
-  await make_game(
-    version,
-    realm_addr,
-    realm_port,
-    sess,
-    cid,
-    script_file,
-    enable_map,
-  );
-}
+//have to use on, localstorage may send messages
+process.on("message", async (msg) => {
+  if (msg.type == "process_args") {
+    const { cname, clid } = msg.arguments;
+    console.debug(
+      "starting character thread with arguments: %O",
+      msg.arguments,
+    );
+    const new_log = LogUtils.log.child({ cname, clid });
+    LogUtils.log = new_log;
+    await make_game(msg.arguments);
+  }
+});
 
 process.send({
   type: "process_ready",
 });
-
-caracal_start();
