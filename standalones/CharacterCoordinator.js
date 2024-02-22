@@ -5,7 +5,7 @@ const bwi = require("bot-web-interface");
 const monitoring_util = require("../monitoring_util");
 const express = require('express');
 const fs_regular = require('node:fs');
-const { LOCALSTORAGE_PATH, LOCALSTORAGE_ROTA_PATH } = require("../src/CONSTANTS")
+const { LOCALSTORAGE_PATH, LOCALSTORAGE_ROTA_PATH, STAT_BEAT_INTERVAL } = require("../src/CONSTANTS")
 const { log, console, ctype_to_clid } = require("../src/LogUtils");
 
 const FileStoredKeyValues = require("../src/FileStoredKeyValues");
@@ -49,12 +49,12 @@ function migrate_old_storage(path, localStorage) {
 }
 
 (async () => {
-  
+
   const localStorage = new FileStoredKeyValues(LOCALSTORAGE_PATH,LOCALSTORAGE_ROTA_PATH);
 
   //migrate from old library which stored everything in single file
   migrate_old_storage("./localStorage/storage.json", localStorage);
-  
+
 
   const sessionStorage = new Map();
   localStorage.set('caracAL', 'Yeah');
@@ -77,11 +77,12 @@ function migrate_old_storage(path, localStorage) {
   //when I change this in the future this might change as well.
   let bwi_instance = {};
   try {
-    if(cfg.web_app && 
+    if(cfg.web_app &&
       (cfg.web_app.enable_bwi || cfg.web_app.enable_minimap)) {
       bwi_instance = new bwi({
         port: cfg.web_app.port,
-        password: null
+        password: null,
+        updateRate: STAT_BEAT_INTERVAL
       });
     }
     let express_inst = bwi_instance.router;
@@ -117,7 +118,7 @@ function migrate_old_storage(path, localStorage) {
   //by sending an ipc if the client is connected and giving some timeout
   //why not actual SIGTERM? cause windows cant even
   async function softkill_block(char_block) {
-    
+
     const proc = char_block.instance;
     char_block.instance = null;
     if(proc) {
@@ -147,7 +148,7 @@ function migrate_old_storage(path, localStorage) {
   function update_siblings_and_acc(info) {
     const sib_names = Object.keys(character_manage)
       .filter(x=>character_manage[x].connected).sort();
-    
+
     sib_names.forEach(char=>{
       safe_send(character_manage[char].instance,{
         type:"siblings_and_acc",
@@ -177,7 +178,7 @@ function migrate_old_storage(path, localStorage) {
     }
     const g_version = char_block.version || version;
     console.log(`starting ${char_name} running version ${g_version} in ${char_block.realm}`);
-    
+
     const args = [g_version,realm.addr,realm.port,sess,char.id,
        char_block.script, cfg.web_app && cfg.web_app.enable_minimap && "yesmap" || "nomap", char_name, ctype_to_clid[char.type] || -1];
     const result = child_process.fork("./src/CharacterThread.js",args,
@@ -216,7 +217,7 @@ function migrate_old_storage(path, localStorage) {
           candidate.script = m.script || char_block.script;
           candidate.version = m.version || char_block.version;
           if(candidate.instance) {
-            
+
             softkill_block(candidate);
             candidate.connected = false;//TODO i need to refractor lifecycle management
           } else {
@@ -225,7 +226,7 @@ function migrate_old_storage(path, localStorage) {
           }
           break;
         case "shutdown":
-          
+
           if(m.character){
             const candidate = character_manage[m.character] || {};
 
@@ -242,7 +243,7 @@ function migrate_old_storage(path, localStorage) {
           let recipients = m.to;
           if(!Array.isArray(recipients)) {
             recipients = [recipients];
-          }        
+          }
           const [locs,globs] = partition(recipients,
             x=>character_manage[x] && character_manage[x].connected);
           if(globs.length > 0) {
@@ -312,7 +313,7 @@ function migrate_old_storage(path, localStorage) {
     if(bwi_instance.publisher) {
       char_block.monitor = monitoring_util.create_monitor_ui(bwi_instance,char_name,char_block,cfg.web_app.enable_minimap);
     }
-    
+
     return result;
   }
   //TODO beta new logic for #5
@@ -326,7 +327,7 @@ function migrate_old_storage(path, localStorage) {
     console.log("now truly exiting");
     process.exit();
   }));
-  
+
   const tasks = Object.keys(character_manage).forEach(c_name=>{
     const char = character_manage[c_name];
     char.connected = false;

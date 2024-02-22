@@ -1,6 +1,6 @@
 const prettyMilliseconds = require('pretty-ms');
-const stat_beat_interval = 500;
 const {PNG} = require('pngjs');
+const { STAT_BEAT_INTERVAL } = require( "./src/CONSTANTS.js" );
 const {max,min,abs,round,floor} = Math;
 
 function humanize_int(num, digits) {
@@ -33,7 +33,7 @@ function register_stat_beat(g_con) {
       result.mmap = "data:image/png;base64,"+generate_minimap(g_con).toString("base64");
     }
     process.send(result);
-  },stat_beat_interval);
+  },STAT_BEAT_INTERVAL);
 }
 
 //g_child is a child process with a stat beat
@@ -66,20 +66,20 @@ function create_monitor_ui(bwi,char_name,child_block,enable_map) {
     if(arr.length < 2) {
       return 0;
     }
-    return (arr[arr.length-1] - arr[0]) * 3600000 / (arr.length-1) / stat_beat_interval;
+    return (arr[arr.length-1] - arr[0]) * 3600000 / (arr.length-1) / STAT_BEAT_INTERVAL;
   }
   const schema = [
     {name: "name", type: "text", label: "Name", getter:()=>char_name},
     {name: "realm", type: "text", label: "Realm", getter:()=>child_block.realm},
     {name: "not_rip", type: "text", label: "Alive", getter:()=>last_beat.rip && "No" || "Yes"},
     {name: "level", type: "text", label: "Level", getter:()=>last_beat.level},
-    {name: "health", type: "labelProgressBar", label: "Health", options: {color: "red"}, 
+    {name: "health", type: "labelProgressBar", label: "Health", options: {color: "red"},
       getter:()=>quick_bar_val(last_beat.hp,last_beat.max_hp)},
     {name: "mana", type: "labelProgressBar", label: "Mana", options: {color: "blue"},
       getter:()=>quick_bar_val(last_beat.mp,last_beat.max_mp)},
-    {name: "xp", type: "labelProgressBar", label: "XP", options: {color: "green"}, 
+    {name: "xp", type: "labelProgressBar", label: "XP", options: {color: "green"},
       getter:()=>quick_bar_val(last_beat.xp,last_beat.max_xp,true)},
-    {name: "inv", type: "labelProgressBar", label: "Inventory", options: {color: "brown"}, 
+    {name: "inv", type: "labelProgressBar", label: "Inventory", options: {color: "brown"},
       getter:()=>quick_bar_val(last_beat.isize - last_beat.esize,last_beat.isize)},
     {name: "gold", type: "text", label: "Gold", getter:()=>humanize_int(last_beat.gold,1)},
     {name: "party_leader", type: "text", label: "Chief", getter:()=>last_beat.party || "N/A"},
@@ -88,9 +88,9 @@ function create_monitor_ui(bwi,char_name,child_block,enable_map) {
       getter:()=>last_beat.t_name && (last_beat.mtype ? "Player " : "")+last_beat.t_name || "None"},
     {name: "gph", type: "text", label: "Gold/h", getter:()=>humanize_int(val_ph(gold_histo),1)},
     {name: "xpph", type: "text", label: "XP/h", getter:()=>humanize_int(xp_ph,1)},
-    {name: "ttlu", type: "text", label: "TTLU", 
+    {name: "ttlu", type: "text", label: "TTLU",
       getter:()=>xp_ph <= 0 && "N/A" || prettyMilliseconds((last_beat.max_xp-last_beat.xp)*3600000/xp_ph,{unitCount: 2})}
-    
+
   ];
   if(enable_map) {
     schema.push({name: "minimap", type: "image", label: "Map", options:
