@@ -3,12 +3,20 @@ const account_info = require("../account_info");
 const game_files = require("../game_files");
 const bwi = require("bot-web-interface");
 const monitoring_util = require("../monitoring_util");
-const express = require('express');
-const fs_regular = require('node:fs');
-const { LOCALSTORAGE_PATH, LOCALSTORAGE_ROTA_PATH, STAT_BEAT_INTERVAL } = require("../src/CONSTANTS")
+const express = require("express");
+const fs_regular = require("node:fs");
+const {
+  LOCALSTORAGE_PATH,
+  LOCALSTORAGE_ROTA_PATH,
+  STAT_BEAT_INTERVAL,
+} = require("../src/CONSTANTS");
 const { log, console, ctype_to_clid } = require("../src/LogUtils");
 
 const FileStoredKeyValues = require("../src/FileStoredKeyValues");
+
+// CharacterCoordinator is started in a new process, so we forward the config file from the previous process
+const args = process.argv.slice(2);
+const CARACAL_CONFIG_PATH = args[0];
 
 //TODO check for invalid session
 //TODO improve termination
@@ -16,12 +24,10 @@ const FileStoredKeyValues = require("../src/FileStoredKeyValues");
 //MAYBE exclude used versions
 
 function partition(a, fun) {
-  const ret = [[],[]];
+  const ret = [[], []];
   for (let i = 0; i < a.length; i++)
-    if (fun(a[i]))
-      ret[0].push(a[i]);
-    else
-      ret[1].push(a[i]);
+    if (fun(a[i])) ret[0].push(a[i]);
+    else ret[1].push(a[i]);
   return ret;
 }
 
@@ -31,43 +37,52 @@ function partition(a, fun) {
 function migrate_old_storage(path, localStorage) {
   let file_contents;
   try {
-    file_contents = fs_regular.readFileSync(path,"utf8");
-  } catch(err) {
-    log.info({type:"ls_migration_none", path},"localStorage migration unnecessary");
+    file_contents = fs_regular.readFileSync(path, "utf8");
+  } catch (err) {
+    log.info(
+      { type: "ls_migration_none", path },
+      "localStorage migration unnecessary",
+    );
     return;
   }
-  if(file_contents.length > 0) {
+  if (file_contents.length > 0) {
     const json_object = JSON.parse(file_contents);
-    for(let [key, value] of Object.entries(json_object)) {
+    for (let [key, value] of Object.entries(json_object)) {
       localStorage.set(key, value);
     }
-    log.info({type:"ls_migration", path, value:Object.keys(json_object).length},"localStorage migrated");
+    log.info(
+      { type: "ls_migration", path, value: Object.keys(json_object).length },
+      "localStorage migrated",
+    );
   }
   fs_regular.unlinkSync(path);
-  log.info({type:"ls_migration_done", path},"old localStorage deleted");
+  log.info({ type: "ls_migration_done", path }, "old localStorage deleted");
   return;
 }
 
 (async () => {
-
-  const localStorage = new FileStoredKeyValues(LOCALSTORAGE_PATH,LOCALSTORAGE_ROTA_PATH);
+  const localStorage = new FileStoredKeyValues(
+    LOCALSTORAGE_PATH,
+    LOCALSTORAGE_ROTA_PATH,
+  );
 
   //migrate from old library which stored everything in single file
   migrate_old_storage("./localStorage/storage.json", localStorage);
 
-
   const sessionStorage = new Map();
-  localStorage.set('caracAL', 'Yeah');
-  sessionStorage.set('caracAL', 'Yup');
+  localStorage.set("caracAL", "Yeah");
+  sessionStorage.set("caracAL", "Yup");
 
-  const version = await game_files.ensure_latest();
+  // const cfg = require("../config");
+  const cfg = require(CARACAL_CONFIG_PATH);
 
-  const cfg = require("../config");
-  if(cfg.cull_versions) {
+  const version = await game_files.ensure_latest(cfg.BASE_URL);
+  if (cfg.cull_versions) {
     await game_files.cull_versions([version]);
   }
   const sess = process.env.AL_SESSION || cfg.session;
-  const my_acc = await account_info(sess);
+
+  const my_acc = await account_info(cfg.BASE_URL, sess);
   const default_realm = my_acc.response.servers[0];
 
   const character_manage = cfg.characters;
@@ -77,29 +92,28 @@ function migrate_old_storage(path, localStorage) {
   //when I change this in the future this might change as well.
   let bwi_instance = {};
   try {
-    if(cfg.web_app &&
-      (cfg.web_app.enable_bwi || cfg.web_app.enable_minimap)) {
+    if (cfg.web_app && (cfg.web_app.enable_bwi || cfg.web_app.enable_minimap)) {
       bwi_instance = new bwi({
         port: cfg.web_app.port,
         password: null,
-        updateRate: STAT_BEAT_INTERVAL
+        updateRate: STAT_BEAT_INTERVAL,
       });
     }
     let express_inst = bwi_instance.router;
-    if(cfg.web_app && cfg.web_app.expose_CODE) {
-      if(!express_inst) {
+    if (cfg.web_app && cfg.web_app.expose_CODE) {
+      if (!express_inst) {
         express_inst = express();
         express_inst.listen(cfg.web_app.port);
       }
-      express_inst.use('/CODE', express.static(__dirname+'/CODE'));
+      express_inst.use("/CODE", express.static(__dirname + "/CODE"));
     }
   } catch (e) {
-    console.error(`failed to start web services.`,e);
+    console.error(`failed to start web services.`, e);
     console.error(`no web services will be available`);
   }
 
   function safe_send(target, data) {
-    if(target) {
+    if (target) {
       target.send(data, undefined, undefined, (e) => {
         //This can occur due to node closing ipc
         //before firing its close handlers
@@ -112,31 +126,30 @@ function migrate_old_storage(path, localStorage) {
   }
 
   function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
   //attempts to softkill child processes
   //by sending an ipc if the client is connected and giving some timeout
   //why not actual SIGTERM? cause windows cant even
   async function softkill_block(char_block) {
-
     const proc = char_block.instance;
     char_block.instance = null;
-    if(proc) {
-      if(char_block.connected) {
+    if (proc) {
+      if (char_block.connected) {
         console.log("telling client to self-terminate");
-        safe_send(proc,{
-          type:"closing_client"
+        safe_send(proc, {
+          type: "closing_client",
         });
         const ended_graceful = await Promise.race([
           sleep(500),
-          new Promise(resolve => {
-            proc.on('exit', function() {
+          new Promise((resolve) => {
+            proc.on("exit", function () {
               console.log("Client terminated gracefully");
               resolve(true);
             });
-          })
+          }),
         ]);
-        if(ended_graceful) {
+        if (ended_graceful) {
           return;
         }
       }
@@ -147,13 +160,14 @@ function migrate_old_storage(path, localStorage) {
 
   function update_siblings_and_acc(info) {
     const sib_names = Object.keys(character_manage)
-      .filter(x=>character_manage[x].connected).sort();
+      .filter((x) => character_manage[x].connected)
+      .sort();
 
-    sib_names.forEach(char=>{
-      safe_send(character_manage[char].instance,{
-        type:"siblings_and_acc",
-        account:info,
-        siblings:sib_names
+    sib_names.forEach((char) => {
+      safe_send(character_manage[char].instance, {
+        type: "siblings_and_acc",
+        account: info,
+        siblings: sib_names,
       });
     });
   }
@@ -161,51 +175,70 @@ function migrate_old_storage(path, localStorage) {
   function start_char(char_name) {
     const char_block = character_manage[char_name];
     let realm = my_acc.resolve_realm(char_block.realm);
-    if(!realm) {
-      console.warn(`could not find realm ${char_block.realm},`,
-        `falling back to realm ${default_realm.key}`);
+    if (!realm) {
+      console.warn(
+        `could not find realm ${char_block.realm},`,
+        `falling back to realm ${default_realm.key}`,
+      );
       char_block.realm = default_realm.key;
       realm = default_realm;
     }
     const char = my_acc.resolve_char(char_name);
     //class is char.type
-    if(!char) {
-      console.error(`could not resolve character ${char_name}`,
-        `this character will not be started`);
-      console.error("are you sure you own this character and have not deleted it?");
+    if (!char) {
+      console.error(
+        `could not resolve character ${char_name}`,
+        `this character will not be started`,
+      );
+      console.error(
+        "are you sure you own this character and have not deleted it?",
+      );
       char_block.enabled = false;
       return;
     }
     const g_version = char_block.version || version;
-    console.log(`starting ${char_name} running version ${g_version} in ${char_block.realm}`);
+    console.log(
+      `starting ${char_name} running version ${g_version} in ${char_block.realm}`,
+    );
 
-    const args = [g_version,realm.addr,realm.port,sess,char.id,
-       char_block.script, cfg.web_app && cfg.web_app.enable_minimap && "yesmap" || "nomap", char_name, ctype_to_clid[char.type] || -1];
-    const result = child_process.fork("./src/CharacterThread.js",args,
-      {stdio: ["ignore", "pipe", "pipe", 'ipc']});
+    const args = [
+      g_version,
+      realm.addr,
+      realm.port,
+      sess,
+      char.id,
+      char_block.script,
+      (cfg.web_app && cfg.web_app.enable_minimap && "yesmap") || "nomap",
+      char_name,
+      ctype_to_clid[char.type] || -1,
+    ];
+    console.log(realm.addr);
+    const result = child_process.fork("./src/CharacterThread.js", args, {
+      stdio: ["ignore", "pipe", "pipe", "ipc"],
+    });
     result.stdout.pipe(process.stdout);
     result.stderr.pipe(process.stderr);
     char_block.instance = result;
-    result.on("exit",()=>{
-      if(char_block.monitor) {
+    result.on("exit", () => {
+      if (char_block.monitor) {
         //close monitor
         char_block.monitor.destroy();
         char_block.monitor = null;
       }
       char_block.connected = false;
       char_block.instance = null;
-      if(char_block.enabled) {
+      if (char_block.enabled) {
         start_char(char_name);
       }
     });
     result.on("message", (m) => {
       switch (m.type) {
         case "initialized":
-          break
+          break;
         case "connected":
           char_block.connected = true;
           update_siblings_and_acc(my_acc.response);
-          break
+          break;
         case "deploy":
           //check for existing charblock, adjust parameters and kill it
           //or not find any, make a new one and start it
@@ -216,93 +249,93 @@ function migrate_old_storage(path, localStorage) {
           candidate.realm = m.realm || char_block.realm;
           candidate.script = m.script || char_block.script;
           candidate.version = m.version || char_block.version;
-          if(candidate.instance) {
-
+          if (candidate.instance) {
             softkill_block(candidate);
-            candidate.connected = false;//TODO i need to refractor lifecycle management
+            candidate.connected = false; //TODO i need to refractor lifecycle management
           } else {
             candidate.connected = false;
             start_char(new_char_name);
           }
           break;
         case "shutdown":
-
-          if(m.character){
+          if (m.character) {
             const candidate = character_manage[m.character] || {};
 
-            console.log(`shutdown requested for ${m.character} from ${char_name}`)
+            console.log(
+              `shutdown requested for ${m.character} from ${char_name}`,
+            );
             candidate.enabled = false;
             softkill_block(candidate);
           } else {
-          console.log("shutdown requested from " + char_name)
-          char_block.enabled = false;
-          softkill_block(char_block);
+            console.log("shutdown requested from " + char_name);
+            char_block.enabled = false;
+            softkill_block(char_block);
           }
           break;
         case "cm":
           let recipients = m.to;
-          if(!Array.isArray(recipients)) {
+          if (!Array.isArray(recipients)) {
             recipients = [recipients];
           }
-          const [locs,globs] = partition(recipients,
-            x=>character_manage[x] && character_manage[x].connected);
-          if(globs.length > 0) {
-            safe_send(char_block.instance,{
-              type:"send_cm",
-              to:globs,
-              data:m.data
+          const [locs, globs] = partition(
+            recipients,
+            (x) => character_manage[x] && character_manage[x].connected,
+          );
+          if (globs.length > 0) {
+            safe_send(char_block.instance, {
+              type: "send_cm",
+              to: globs,
+              data: m.data,
             });
           }
-          locs.forEach(blk=>{
-            safe_send(character_manage[blk].instance,{
-              type:"receive_cm",
-              name:char_name,
-              data:m.data
+          locs.forEach((blk) => {
+            safe_send(character_manage[blk].instance, {
+              type: "receive_cm",
+              name: char_name,
+              data: m.data,
             });
           });
           break;
         //localStorage and sessionStorage related
         case "stor":
-          const trg_store = m.ident == "ls"
-            ? localStorage
-            : sessionStorage;
-          switch(m.op) {
+          const trg_store = m.ident == "ls" ? localStorage : sessionStorage;
+          switch (m.op) {
             case "set":
-              for(let key in m.data) {
-                trg_store.set(key,m.data[key]);
+              for (let key in m.data) {
+                trg_store.set(key, m.data[key]);
               }
               break;
             case "del":
-              for(let key of m.data) {
+              for (let key of m.data) {
                 trg_store.delete(key);
               }
               break;
             case "clear":
-              for(let [key, value] of trg_store.entries()) {
+              for (let [key, value] of trg_store.entries()) {
                 trg_store.delete(key);
               }
               break;
             case "init":
-              const catchup_data={};
-              for(let [key, value] of trg_store.entries()) {
+              const catchup_data = {};
+              for (let [key, value] of trg_store.entries()) {
                 catchup_data[key] = value;
               }
-              safe_send(char_block.instance,{
-                type:"stor",
-                op:"set",
-                ident:m.ident,
-                data:catchup_data
+              safe_send(char_block.instance, {
+                type: "stor",
+                op: "set",
+                ident: m.ident,
+                data: catchup_data,
               });
               break;
             default:
               break;
           }
-          if(m.op != "init") {
+          if (m.op != "init") {
             //forward to other running processes
             Object.values(character_manage)
-              .filter(x=>x.instance)
-              .forEach(block=>{
-                safe_send(block.instance,m);
+              .filter((x) => x.instance)
+              .forEach((block) => {
+                safe_send(block.instance, m);
               });
           }
           break;
@@ -310,32 +343,42 @@ function migrate_old_storage(path, localStorage) {
           break;
       }
     });
-    if(bwi_instance.publisher) {
-      char_block.monitor = monitoring_util.create_monitor_ui(bwi_instance,char_name,char_block,cfg.web_app.enable_minimap);
+    if (bwi_instance.publisher) {
+      char_block.monitor = monitoring_util.create_monitor_ui(
+        bwi_instance,
+        char_name,
+        char_block,
+        cfg.web_app.enable_minimap,
+      );
     }
 
     return result;
   }
   //TODO beta new logic for #5
   //i need to implement decent lifecycle-handling
-  ['SIGINT', 'SIGTERM', 'SIGQUIT']
-  .forEach(signal => process.on(signal, async () => {
-    console.log(`Received ${signal} on master. Rounding up clients`);
-    //softkill all chars, giving them chance to shutdown
-    await Promise.all(Object.values(character_manage).map(
-            char_block => {char_block.enabled = false; return softkill_block(char_block)}));
-    console.log("now truly exiting");
-    process.exit();
-  }));
+  ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) =>
+    process.on(signal, async () => {
+      console.log(`Received ${signal} on master. Rounding up clients`);
+      //softkill all chars, giving them chance to shutdown
+      await Promise.all(
+        Object.values(character_manage).map((char_block) => {
+          char_block.enabled = false;
+          return softkill_block(char_block);
+        }),
+      );
+      console.log("now truly exiting");
+      process.exit();
+    }),
+  );
 
-  const tasks = Object.keys(character_manage).forEach(c_name=>{
+  const tasks = Object.keys(character_manage).forEach((c_name) => {
     const char = character_manage[c_name];
     char.connected = false;
-    if(char.enabled) {
+    if (char.enabled) {
       start_char(c_name);
     }
   });
   my_acc.add_listener(update_siblings_and_acc);
-})().catch(e => {
+})().catch((e) => {
   console.error("failed to start caracAL", e);
 });

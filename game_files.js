@@ -1,18 +1,17 @@
-const base_url = "https://adventure.land";
 const fs = require("fs").promises;
-const {createWriteStream} = require('fs');
-const {pipeline} = require('stream');
-const {promisify} = require('util');
+const { createWriteStream } = require("fs");
+const { pipeline } = require("stream");
+const { promisify } = require("util");
 const streamPipeline = promisify(pipeline);
-const fetch = require('node-fetch');
-const path = require('path');
+const fetch = require("node-fetch");
+const path = require("path");
 const { console } = require("./src/LogUtils");
 
 function get_runner_files() {
   return [
     "/js/common_functions.js",
-		"/js/runner_functions.js",
-		"/js/runner_compat.js"
+    "/js/runner_functions.js",
+    "/js/runner_compat.js",
   ];
 }
 function get_game_files() {
@@ -27,51 +26,53 @@ function get_game_files() {
     "/js/html.js",
     "/js/payments.js",
     "/js/keyboard.js",
-    "/data.js"
+    "/data.js",
   ];
 }
 
 async function cull_versions(exclusions) {
   const all_versions = await available_versions();
-  const target_culls = all_versions.filter((x,i)=>i >= 2 && !exclusions.includes(x));
-  for(let cull of target_culls) {
+  const target_culls = all_versions.filter(
+    (x, i) => i >= 2 && !exclusions.includes(x),
+  );
+  for (let cull of target_culls) {
     try {
       console.log("culling version " + cull);
-      await fs.rmdir("./game_files/" + cull, {recursive: true});
-    } catch(e) {
-      console.warn("failed to cull version " + cull,e);
+      await fs.rmdir("./game_files/" + cull, { recursive: true });
+    } catch (e) {
+      console.warn("failed to cull version " + cull, e);
     }
   }
 }
 
 async function available_versions() {
-  return  (await fs.readdir("./game_files",
-    {withFileTypes: true}))
-    .filter(dirent => dirent.isDirectory())
-    .map(dirent => dirent.name)
-    .filter(x=>x.match(/^\d+$/))
-    .map(x=>parseInt(x))
-    .sort().reverse();
+  return (await fs.readdir("./game_files", { withFileTypes: true }))
+    .filter((dirent) => dirent.isDirectory())
+    .map((dirent) => dirent.name)
+    .filter((x) => x.match(/^\d+$/))
+    .map((x) => parseInt(x))
+    .sort()
+    .reverse();
 }
 
-async function download_file(url,file_p) {
+async function download_file(url, file_p) {
   const response = await fetch(url);
 
   if (!response.ok) {
     throw new Error(`failed to download ${url}: ${response.statusText}`);
-  } 
+  }
 
   return await streamPipeline(response.body, createWriteStream(file_p));
 }
 
-async function get_latest_version() {
+async function get_latest_version(base_url) {
   const raw = await fetch(base_url);
-  if(!raw.ok) {
+  if (!raw.ok) {
     throw new Error(`failed to check version: ${raw.statusText}`);
   }
   const html = await raw.text();
   const match = /game\.js\?v=([0-9]+)"/.exec(html);
-  if(!match) {
+  if (!match) {
     throw new Error(`malformed version response`);
   }
   return parseInt(match[1]);
@@ -81,26 +82,26 @@ function locate_game_file(resource, version) {
   return `./game_files/${version}/${path.posix.basename(resource)}`;
 }
 
-async function ensure_latest() {
-  const version = await get_latest_version();
-  if((await available_versions()).includes(version)) {
+async function ensure_latest(base_url) {
+  const version = await get_latest_version(base_url);
+  if ((await available_versions()).includes(version)) {
     console.log(`version ${version} is already downloaded`);
-  }
-  else {
+  } else {
     console.log(`downloading version ${version}`);
-    const fpath = "./game_files/"+version;
+    const fpath = "./game_files/" + version;
     try {
       await fs.mkdir(fpath);
-      const target_files = get_game_files()
-        .concat(get_runner_files())
+      const target_files = get_game_files(base_url)
+        .concat(get_runner_files(base_url))
         //remove duplicates
-        .filter(function(item, pos, self) {
+        .filter(function (item, pos, self) {
           return self.indexOf(item) == pos;
         });
-      const tasks = target_files.map(itm=>download_file(
-        base_url+itm,locate_game_file(itm,version)));
+      const tasks = target_files.map((itm) =>
+        download_file(base_url + itm, locate_game_file(itm, version)),
+      );
       await Promise.all(tasks);
-    } catch(e) {
+    } catch (e) {
       await fs.rmdir(fpath, { recursive: true });
       throw e;
     }
