@@ -103,7 +103,7 @@ function migrate_old_storage(path, localStorage) {
       );
       express_inst.use("/CODE", express.static(__dirname + "/../CODE"));
     }
-    if (cfg.web_app && cfg.web_app.expose_TYPECODE) {
+    if (cfg.web_app && cfg.web_app.expose_TYPECODE && cfg.enable_TYPECODE) {
       if (!express_inst) {
         express_inst = express();
         express_inst.listen(cfg.web_app.port);
@@ -217,11 +217,14 @@ function migrate_old_storage(path, localStorage) {
       sess: sess,
       cid: char.id,
       script_file: char_block.script,
-      typescript_file: char_block.typescript,
+
       enable_map: !!(cfg.web_app && cfg.web_app.enable_minimap),
       cname: char_name,
       clid: ctype_to_clid[char.type] || -1,
     };
+    if (cfg.enable_TYPECODE) {
+      args.typescript_file = char_block.typescript;
+    }
 
     const result = child_process.fork("./src/CharacterThread.js", [], {
       stdio: ["ignore", "pipe", "pipe", "ipc"],

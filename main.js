@@ -24,7 +24,7 @@ const StreamMultiplexer = require("./src/StreamMultiplexer");
       [
         "node",
         "./node_modules/logrotate-stream/bin/logrotate-stream",
-        "./logs/webpack.log.jsonl",
+        "./logs/webpack.log",
         "--keep",
         "3",
         "--size",
