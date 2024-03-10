@@ -4,31 +4,20 @@ A Node.js client for [adventure.land](https://adventure.land/ "Adventure Land")
 
 ## Recent Versions
 
-### Better 🌲 __logging__
+### Typescript
 
-#### 2023-09-09
+#### 2024-03-10
 
 ##### npm install required
 
-##### BREAKING CHANGES
+This update introduces the ability to run TypeScript directly in caracAL.
 
-This update updates the internal logging to use JSON format powered by [pino](https://www.npmjs.com/package/pino "the logging framework pino").
+TypeScript is much similar to JavaScript but allows code to be much safer in development and enables better autocompletion in IDEs.
 
-This enables significantly better formatting of console output, including which character sent a log and colored logs.
+TypeScript is opt-in. If you would like to continue working with JavaScript you can. If you already have a working pipeline with TypeScript it will continue to work.
 
-The logfiles were moved into a separate logs folder but are still subject to logrotate.
-
-For more details see the README about [🌲Logging](./README.md#🌲logging "logging section of README.md").
-
-Also, I updated localStorage.
-
-It is no longer stored as a single json file but as newline-delimited json (ndjson/jsonl) with one key per line.
-The filename is now `localStorage/caraGarage.jsonl`.
-Existing localStorage should get migrated automatically.
-
-Large files should no longer lock up the application, but it will take more storage space in the process.
-
-Behind the scenes I have done a lot of refactoring to make the codebase more maintainable. I will continue to do so as I add new features.
+caracAL also allows you to expose your TypeScript creations via webserver.
+You can use this capability to load fully bundled versions of your code into other places, such as the official client while developing.
 
 ### Upgrading from a git installation
 
@@ -101,7 +90,7 @@ node main.js
 
 ## First run and configuration
 
-When you first run caracAL it will ask you for your login credentials to adventure.land. After you have sucessfully entered them it will ask you which characters to start and in which realm. Finally it will ask you if you want to use the bot monitoring panel, and if you answer that with yes also if you want a minimap and what port you want it to be on. Once these questions are answered caracAL will generate a file config.js for you, containing the information you just entered. The characters you specified will immediately be loaded into caracAL and start farming crabs using the script example.js.
+When you first run caracAL it will ask you for your login credentials to adventure.land. After you have sucessfully entered them it will ask you which characters to start and in which realm. Finally it will ask you if you want to use the bot monitoring panel, and if you answer that with yes also if you want a minimap and what port you want it to be on. Once these questions are answered caracAL will generate a file config.js for you, containing the information you just entered. The characters you specified will immediately be loaded into caracAL and start farming crabs using the script example.js or crabs_with_tophats.js if you chose to enable TypeScript.
 
 ### config.js
 
@@ -111,6 +100,9 @@ caracAL stores versions of the game client on your disk, in the game_files folde
 If set, the cull_versions key makes caracAL delete these versions, except the two most recent ones.
 Versions which are not numeric will not be considered for culling.
 
+enable_TYPECODE determines if you want to enable the TypeScript integration.
+Enabling this will start a WebPack process and allow you to specify the typescript property on your characters.
+
 log_level specifies how much logging you want. For more details refer to section [log_level](./README.md#log_level "log_level").
 
 log_sinks specifies where your logging goes. More details in the section [log_sinks](./README.md#log_sinks "log_sinks").
@@ -119,18 +111,23 @@ The web_app section contains configuration that enables caracAL to host a webser
 The enable_bwi option opens a monitoring panel that displays the status of the characters running within caracAL if set to true.
 The enable_minimap option configures if caracAL should generate a minimap summarizing your current game state. The minimap is located in the monitoring panel. Therefore, if the minimap is enabled, the monitoring panel will always be served and ignore the previous setting.
 The expose_CODE option shares the CODE directory, where your scripts are located, via the webserver. This is useful if you i.e. want to load the scripts you are using in caracAL from the steam client. Scripts shared in this manner will be available i.e. under the URL `localhost:924/CODE/caracAL/tests/cm_test.js`.
+The expose_TYPECODE option is the TypeScript analogon of expose_CODE. It requires enable_TYPECODE to be true. Scripts will be reachable under `http://localhost:924/TYPECODE/caracAL/examples/crabs_with_tophats.js`. Take special note that even though you developed in TypeScript, the output will be compiled and in .js form.
 If you do not enable either of these options no webserver will be opened. config.js files which do not have the web_app section, i.e. those, which were created before the update, will not open a webserver either.
 
-The characters key contains information about which characters to run. 
-Each character has four fields:
- - realm: Which server the character should run on
- - script: Which script the character should run. Scripts are located in the CODE folder.
- - enabled: caracAL will only run characters who have this field set to true
- - version: Which version of the game client this character should run. A value of 0 represents the latest version
+The characters key contains information about which characters to run.
+Each character has five fields:
+
+- realm: Which server the character should run on
+- enabled: caracAL will only run characters who have this field set to true
+- version: Which version of the game client this character should run. A value of 0 represents the latest version
+
+- script: Which JavaScript script the character should run. Scripts are located in the CODE folder. Will be ignored in a TypeScript setup.
+- typescript: Which TypeScript script the character should run. Scripts are located in the TYPECODE folder. Requires enable_TYPESCRIPT to be set to true. Take note that the file ending specified still needs to be .js and not .ts .
 
 ### Running your own code
-The default code located at `./CODE/example.js`, as specified by the character property `script`. This script makes your characters farm tiny crabs on the beach.
-You can create your own scripts in the `./CODE/` directory. Since caracAL runs the same files as the game client you should be able to use the exact same files in caracAL.
+
+The default code located is at `./CODE/caracAL/examples/crabs.js` or `./TYPECODE/caracAL/examples/crabs_with_tophats.ts`, as specified by the character properties `script` or `typescript`, depending on wether or not TypeScript is enabled. These scripts make your characters farm tiny crabs on the beach.
+You can create your own scripts in the `./CODE/` or `./TYPECODE` directory. Since caracAL runs the same files as the game client you should be able to use the exact same files in caracAL.
 
 ## So why should I use caracAL?
 
@@ -138,7 +135,7 @@ There is one big reason and that is
 
 ### Parity with the regular game client
 
-caracAL runs the same files as the regular client. You can use the same scripts in caracAL and in the normal client. This means that you can develop your scripts in the game and later deploy them with caracAL. This is the key selling point over competitors like ALclient, who develops a completely new client entirely and ALbot, which has only recently switched to an architecture quite similar to caracAL. 
+caracAL runs the same files as the regular client. You can use the same scripts in caracAL and in the normal client. This means that you can develop your scripts in the game and later deploy them with caracAL. This is the key selling point over competitors like ALclient, who develops a completely new client entirely and ALbot, which has only recently switched to an architecture quite similar to caracAL.
 
 Keep in mind that some functionality does not make sense in a headless client. This notably concerns the lack of a HTML document and a renderer.
 Most HTML routines do not throw an error, but do not expect them to do anything. Calls to PIXI routines should really be mostly avoided.
@@ -149,31 +146,44 @@ If you want to implement HTML or PIXI functionality, check that `parent.no_graph
 Compiling the game sources directly into Node.js V8 engine yields performance which is actually serviceable for smaller devices.
 The CLI aimed to do the same thing, but it ended up poorly emulating a webpage, which led to atrocious performance.
 
+### Painless TypeScript setup
+
+Getting started with TypeScript can be challenging because there you need to find a source for bindings, setup a compiler among many other things.
+caracAL has some sensible defaults that allow you get started with TypeScript in a very quick manner.
+
+In order to accomplish running TypeScript files, caracAL starts a webpack instance.
+
+The WebPack instance logs directly into the console. You will notice it is not formatted.
+
+The WebPack logs can be viewed at `./logs/webpack.log`
+
 ## Additional features
 
 Some functionality is available through browser-based apis. Notably character deployment and script loading is realized through `<iframe>`, `window.location` and `<script>`. In order to make this functionality available in caracAL we provide the extension `parent.caracAL`. Check out some basic usage here:
+
 ```javascript
 //check if we are running in caracAL
-if(parent.caracAL) {
-  if(we_want_to_run_another_char) {
-      //runs other char with script farm_snakes.js in current realm
-      parent.caracAL.deploy(another_char_name,null,"farm_snakes.js");
+if (parent.caracAL) {
+  if (we_want_to_run_another_char) {
+    //runs other char with script farm_snakes.js in current realm
+    parent.caracAL.deploy(another_char_name, null, "farm_snakes.js");
   }
-  if(we_want_to_switch_this_chars_server) {
-      //runs current char with current script in US 2
-      parent.caracAL.deploy(null,"USII");
+  if (we_want_to_switch_this_chars_server) {
+    //runs current char with current script in US 2
+    parent.caracAL.deploy(null, "USII");
   }
-  if(we_want_to_shut_this_char_down) {
-      //shuts down current character
-      parent.caracAL.shutdown();
+  if (we_want_to_shut_this_char_down) {
+    //shuts down current character
+    parent.caracAL.shutdown();
   }
-  if(we_want_to_know_which_chars_run_in_caracAL) {
-      console.log(parent.caracAL.siblings);
+  if (we_want_to_know_which_chars_run_in_caracAL) {
+    console.log(parent.caracAL.siblings);
   }
-  if(we_want_to_load_an_additional_script) {
-      //get a promise for loading the script ./CODE/bonus_script.js
-      parent.caracAL.load_scripts(["bonus_script.js"])
-        .then(()=>console.log("the new script is loaded"));
+  if (we_want_to_load_an_additional_script) {
+    //get a promise for loading the script ./CODE/bonus_script.js
+    parent.caracAL
+      .load_scripts(["bonus_script.js"])
+      .then(() => console.log("the new script is loaded"));
   }
 }
 ```
@@ -194,18 +204,20 @@ If you are not comfortable storing a secret like your auth key plaintext in a fi
 
 In previous versions of caracAL output from the characters and the coordinator was sent into a file and to the console unformatted.  
 This had some major drawbacks that I was willing to accept at the time because data streaming is hard.
+
 - It was impossible to know which character sent a log
 - Formatting with colors was impossible
 - The log could not easily be ingested into a TimeSeriesDB such as InfluxDB
 
-I finally tackled these by bringing in the logging Framework __🌲Pino__.
+I finally tackled these by bringing in the logging Framework **🌲Pino**.
 
 #### Structured Logging
 
-In __🌲Pino__ every log message is a JSON object.  
+In **🌲Pino** every log message is a JSON object.  
 The entire log is a lot of newline-delimited JSON objects (ndjson/jsonl).  
 This allows us to store log metadata such as log time, which character logged it, log levels and colors.
 A typical log now looks like so:
+
 ```json
 {"level":30,"time":1694346299637,"id":"SlMw","type":"unspecified","type":"console","func":"log","args":[],"msg":"updating account info"}
 {"level":30,"time":1694346299653,"id":"EwAR","type":"unspecified","cname":"CodeGorm","clid":"2","col":"gray","type":"game_logs","msg":"You killed a Tiny Crab"}
@@ -221,15 +233,21 @@ They will be wrapped into an appropriate JSON automatically.
 By default Adventure land does not support structured logging.  
 In order to explicitly access the structured logger you can use `parent.caracAL.log`.  
 The logging object is backed by pino. For example:
+
 ```js
-parent.caracAL.log.warn({type:"answer to everything", col:"yellow"}, "it is 42");
+parent.caracAL.log.warn(
+  { type: "answer to everything", col: "yellow" },
+  "it is 42",
+);
 ```
+
 For a more complete reference you can refer to [the pino API docs](https://github.com/pinojs/pino/blob/master/docs/api.md "the pino api docs")
 
 #### Supported Properties
 
 caracAL has a custom log formatter located in `./standalones/Logprinter.js`.  
 It supports the following automatic log properties:
+
 - level : which log level the message is on. more important messages are higher level
 - time : a unix timestamp (seconds sine 1970-01-01) when the message occurred.
 - id : a random generated char sequence to identify different threads.
@@ -237,11 +255,12 @@ It supports the following automatic log properties:
 - clid : an int representing which class the character is
 
 as well as the following custom (set by you) properties:
-- type : a user-defined identifier for the type of message. 
+
+- type : a user-defined identifier for the type of message.
 - func : a user-defined identifier, which can be used in conjunction with type to further specify message origin.
 - col : which color to render msg or val in.  
-you can put anything in here but only the following will render in console:  
-`["gray", "red", "cyan", "magenta", "yellow", "green", "blue"]`
+  you can put anything in here but only the following will render in console:  
+  `["gray", "red", "cyan", "magenta", "yellow", "green", "blue"]`
 - msg : a textual representation of the message you want to log.
 - val : if you dont want to log a message but rather a measurement you can use this.
 
