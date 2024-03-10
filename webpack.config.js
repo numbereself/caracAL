@@ -2,7 +2,6 @@ const path = require("node:path");
 const WebpackWatchedGlobEntries = require("webpack-watched-glob-entries-plugin");
 
 module.exports = {
-  watch: true,
   mode: "none",
   entry: WebpackWatchedGlobEntries.getEntries(
     [

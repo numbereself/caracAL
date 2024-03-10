@@ -217,7 +217,6 @@ function migrate_old_storage(path, localStorage) {
       sess: sess,
       cid: char.id,
       script_file: char_block.script,
-
       enable_map: !!(cfg.web_app && cfg.web_app.enable_minimap),
       cname: char_name,
       clid: ctype_to_clid[char.type] || -1,
