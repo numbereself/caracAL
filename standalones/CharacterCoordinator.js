@@ -8,6 +8,7 @@ const fs_regular = require("node:fs");
 const {
   LOCALSTORAGE_PATH,
   LOCALSTORAGE_ROTA_PATH,
+  STAT_BEAT_INTERVAL,
 } = require("../src/CONSTANTS");
 const { log, console, ctype_to_clid } = require("../src/LogUtils");
 
@@ -89,6 +90,7 @@ function migrate_old_storage(path, localStorage) {
       bwi_instance = new bwi({
         port: cfg.web_app.port,
         password: null,
+        updateRate: STAT_BEAT_INTERVAL,
       });
     }
     let express_inst = bwi_instance.router;
