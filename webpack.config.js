@@ -23,6 +23,9 @@ module.exports = {
       },
     ],
   },
+  resolve: {
+    extensions: [".ts", ".tsx", ".js"],
+  },
   output: {
     path: path.resolve(__dirname, "TYPECODE.out"),
     clean: true,

@@ -196,7 +196,7 @@ const fallback = (first, second) =>
 
 function make_cfg_string(conf_object = {}) {
   const ezpz = (key, substitute) =>
-    `${key.split(".").pop()}:${fallback(
+    `${key.split(".").pop()}: ${fallback(
       key
         .split(".")
         .reduce(
@@ -257,7 +257,7 @@ module.exports = {
     ],
     ["node", "./standalones/LogPrinter.js"],
   ])},
-  web_app:{
+  web_app: {
     //enables the monitoring dashboard
     ${ezpz("web_app.enable_bwi", false)},
     //enables the minimap in dashboard
@@ -274,14 +274,14 @@ module.exports = {
     //which port to run webservices on
     ${ezpz("web_app.port", 924)}
   },
-  characters:{
+  characters: {
 ${Object.entries(characters)
   .map(
     ([cname, cconf]) => `    ${JSON.stringify(cname)}:{
       realm: ${fallback(cconf.realm, "EUI")},
       ${
         cconf.typescript
-          ? "typescript: " + cconf.typescript
+          ? "typescript: " + JSON.stringify(cconf.typescript)
           : "script: " + fallback(cconf.script, "caracAL/examples/crabs.js")
       },
       enabled: ${fallback(cconf.enabled, false)},
