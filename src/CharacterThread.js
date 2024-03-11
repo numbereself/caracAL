@@ -4,7 +4,8 @@ const fs = require("fs").promises;
 const { JSDOM } = require("jsdom");
 const node_query = require("jquery");
 const game_files = require("../game_files");
-const fetch = require("node-fetch");
+const fetch = (...args) =>
+  import("node-fetch").then(({ default: fetch }) => fetch(...args));
 const monitoring_util = require("../monitoring_util");
 const ipc_storage = require("../ipcStorage");
 
