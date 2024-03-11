@@ -4,7 +4,22 @@ Here you can review the historic development of caracAL.
 
 I do not bundle releases but with the timestamp you can usually find the relevant git commit.
 
-### Better 🌲 __logging__
+### Typescript
+
+#### 2024-03-10
+
+##### npm install required
+
+This update introduces the ability to run TypeScript directly in caracAL.
+
+TypeScript is much similar to JavaScript but allows code to be much safer in development and enables better autocompletion in IDEs.
+
+TypeScript is opt-in. If you would like to continue working with JavaScript you can. If you already have a working pipeline with TypeScript it will continue to work.
+
+caracAL also allows you to expose your TypeScript creations via webserver.
+You can use this capability to load fully bundled versions of your code into other places, such as the official client while developing.
+
+### Better 🌲 **logging**
 
 #### 2023-09-09
 
@@ -57,4 +72,4 @@ Also special characters are now respected in login process
 
 ##### npm install required
 
-This update finally introduces localStorage and sessionStorage. However, in order to provide these technologies we need to bring in additional dependencies. Follow the steps below to upgrade to the most recent version. This version renames the default scripts. The default code file `example.js` now resides in `caracAL/examples/crabs.js`. If you were running the default crab script please edit or regenerate your config file in order to match the changed filename. 
+This update finally introduces localStorage and sessionStorage. However, in order to provide these technologies we need to bring in additional dependencies. Follow the steps below to upgrade to the most recent version. This version renames the default scripts. The default code file `example.js` now resides in `caracAL/examples/crabs.js`. If you were running the default crab script please edit or regenerate your config file in order to match the changed filename.
