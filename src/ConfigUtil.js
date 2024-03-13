@@ -29,9 +29,9 @@ async function make_auth(email, password) {
     let match;
     req.headers
       .raw()
-      ["set-cookie"].find(
-        (x) => (match = /auth=([0-9]+-[a-zA-Z0-9]+)/.exec(x)),
-      );
+      [
+        "set-cookie"
+      ].find((x) => (match = /auth=([0-9]+-[a-zA-Z0-9]+)/.exec(x)));
     return match[1];
   }
   if (msg.message == "Logged In!") {
