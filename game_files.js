@@ -3,7 +3,8 @@ const { createWriteStream } = require("fs");
 const { pipeline } = require("stream");
 const { promisify } = require("util");
 const streamPipeline = promisify(pipeline);
-const fetch = require("node-fetch");
+const fetch = (...args) =>
+  import("node-fetch").then(({ default: fetch }) => fetch(...args));
 const path = require("path");
 const { console } = require("./src/LogUtils");
 

@@ -1,6 +1,7 @@
 "use strict";
 var inquirer = require("inquirer");
-const fetch = require("node-fetch");
+const fetch = (...args) =>
+  import("node-fetch").then(({ default: fetch }) => fetch(...args));
 const account_info = require("../account_info");
 const fs = require("fs").promises;
 const { constants } = require("fs");
@@ -148,45 +149,53 @@ async function prompt_new_cfg(base_url) {
     console.warn("you did not enable any chars");
     console.log("but you can change that manually in the config file");
   }
-  const { realm, use_bwi, use_minimap, port } = await inquirer.prompt([
-    {
-      type: "list",
-      name: "realm",
-      message: "Which realm do you want your chars to run in",
-      choices: all_realms,
-    },
-    {
-      type: "list",
-      name: "use_bwi",
-      message: "Do you want to use the web monitoring panel?",
-      choices: yesno_choice,
-    },
-    {
-      type: "list",
-      name: "use_minimap",
-      message: `Do you also want to enable the minimap?
+  const { realm, use_bwi, use_minimap, port, typescript_enabled } =
+    await inquirer.prompt([
+      {
+        type: "list",
+        name: "realm",
+        message: "Which realm do you want your chars to run in",
+        choices: all_realms,
+      },
+      {
+        type: "list",
+        name: "typescript_enabled",
+        message: "Do you want to enable TypeScript Integration?",
+        choices: yesno_choice,
+      },
+      {
+        type: "list",
+        name: "use_bwi",
+        message: "Do you want to use the web monitoring panel?",
+        choices: yesno_choice,
+      },
+      {
+        type: "list",
+        name: "use_minimap",
+        message: `Do you also want to enable the minimap?
 If you want max performance you should choose no.`,
-      choices: yesno_choice,
-      when(answers) {
-        return answers.use_bwi;
+        choices: yesno_choice,
+        when(answers) {
+          return answers.use_bwi;
+        },
       },
-    },
-    {
-      type: "number",
-      name: "port",
-      message: "What port would you like to run the web panel on?",
-      when(answers) {
-        return answers.use_bwi;
+      {
+        type: "number",
+        name: "port",
+        message: "What port would you like to run the web panel on?",
+        when(answers) {
+          return answers.use_bwi;
+        },
+        default: 924,
       },
-      default: 924,
-    },
-  ]);
+    ]);
   //console.log({realm,use_bwi,use_minimap,port});
 
   const conf_object = {
     BASE_URL: base_url,
     session: session,
     cull_versions: true,
+    enable_TYPECODE: typescript_enabled,
     log_level: "info",
     log_sinks: [
       [
@@ -209,10 +218,14 @@ If you want max performance you should choose no.`,
     characters: all_chars.reduce((acc, c_name, i) => {
       acc[c_name] = {
         realm: realm,
-        script: "caracAL/examples/crabs.js",
         enabled: enabled_chars.includes(i),
         version: 0,
       };
+      if (typescript_enabled) {
+        acc[c_name].typescript = "caracAL/examples/crabs_with_tophats.js";
+      } else {
+        acc[c_name].script = "caracAL/examples/crabs.js";
+      }
       return acc;
     }, {}),
   };
@@ -225,7 +238,7 @@ const fallback = (first, second) =>
 
 function make_cfg_string(conf_object = {}) {
   const ezpz = (key, substitute) =>
-    `${key.split(".").pop()}:${fallback(
+    `${key.split(".").pop()}: ${fallback(
       key
         .split(".")
         .reduce(
@@ -249,7 +262,7 @@ function make_cfg_string(conf_object = {}) {
     },
     GG: {
       realm: "ASIAI",
-      script: "caracAL/tests/cm_test.js",
+      typescript: "caracAL/examples/crabs_with_tophats.js",
       enabled: false,
       version: 0,
     },
@@ -264,6 +277,9 @@ module.exports = {
   ${ezpz("session", "1111111111111111-abc123ABCabc123ABCabc")}, 
   //delete all versions except the two latest ones
   ${ezpz("cull_versions", true)},
+  //If you want caracAL to compile TypeScript and use the TYPECODE folder
+  //This works by running Webpack in the background
+  ${ezpz("enable_TYPECODE", true)},
   //how much logging you want
   //set to "debug" for more logging and "warn" for less logging
   ${ezpz("log_level", "info")},
@@ -280,32 +296,39 @@ module.exports = {
       "--keep",
       "3",
       "--size",
-      "1500000",
+      "4500000",
     ],
     ["node", "./standalones/LogPrinter.js"],
   ])},
-  web_app:{
+  web_app: {
     //enables the monitoring dashboard
     ${ezpz("web_app.enable_bwi", false)},
     //enables the minimap in dashboard
     //setting this to true implicitly
     //enables the dashboard
     ${ezpz("web_app.enable_minimap", false)},
-    //exposes the CODE directory
-    //useful i.e. if you want to
-    //load your code outside of caracAL
+    //exposes the CODE directory via http
+    //this lets you load and debug outside of caracAL
     ${ezpz("web_app.expose_CODE", false)},
+    //exposes the TYPECODE.out directory via http
+    //this lets you load and debug outside of caracAL
+    //useful if you want to dev in regular client
+    ${ezpz("web_app.expose_TYPECODE", false)},
     //which port to run webservices on
     ${ezpz("web_app.port", 924)}
   },
-  characters:{
+  characters: {
 ${Object.entries(characters)
   .map(
     ([cname, cconf]) => `    ${JSON.stringify(cname)}:{
-      realm:${fallback(cconf.realm, "EUI")},
-      script:${fallback(cconf.script, "caracAL/examples/crabs.js")},
-      enabled:${fallback(cconf.enabled, false)},
-      version:${fallback(cconf.version, 0)}
+      realm: ${fallback(cconf.realm, "EUI")},
+      ${
+        cconf.typescript
+          ? "typescript: " + JSON.stringify(cconf.typescript)
+          : "script: " + fallback(cconf.script, "caracAL/examples/crabs.js")
+      },
+      enabled: ${fallback(cconf.enabled, false)},
+      version: ${fallback(cconf.version, 0)}
     }`,
   )
   .join(",\n")}
@@ -332,8 +355,4 @@ async function interactive(configPath) {
   }
 }
 
-module.exports = {
-  interactive,
-  prompt_new_cfg,
-  make_cfg_string,
-};
+module.exports = { interactive, prompt_new_cfg, make_cfg_string };

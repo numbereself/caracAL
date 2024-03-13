@@ -105,7 +105,25 @@ function migrate_old_storage(path, localStorage) {
         express_inst = express();
         express_inst.listen(cfg.web_app.port);
       }
-      express_inst.use("/CODE", express.static(__dirname + "/CODE"));
+      log.info(
+        { type: "CODE_exposed", src_path: __dirname + "/../CODE" },
+        "Serving CODE statically",
+      );
+      express_inst.use("/CODE", express.static(__dirname + "/../CODE"));
+    }
+    if (cfg.web_app && cfg.web_app.expose_TYPECODE && cfg.enable_TYPECODE) {
+      if (!express_inst) {
+        express_inst = express();
+        express_inst.listen(cfg.web_app.port);
+      }
+      log.info(
+        { type: "TYPECODE_exposed", src_path: __dirname + "/../TYPECODE.out" },
+        "Serving TYPECODE statically",
+      );
+      express_inst.use(
+        "/TYPECODE",
+        express.static(__dirname + "/../TYPECODE.out"),
+      );
     }
   } catch (e) {
     console.error(`failed to start web services.`, e);
@@ -200,22 +218,25 @@ function migrate_old_storage(path, localStorage) {
     console.log(
       `starting ${char_name} running version ${g_version} in ${char_block.realm}`,
     );
+    const args = {
+      version: g_version,
+      realm_addr: realm.addr,
+      realm_port: realm.port,
+      sess: sess,
+      cid: char.id,
+      script_file: char_block.script,
+      enable_map: !!(cfg.web_app && cfg.web_app.enable_minimap),
+      cname: char_name,
+      clid: ctype_to_clid[char.type] || -1,
+    };
+    if (cfg.enable_TYPECODE) {
+      args.typescript_file = char_block.typescript;
+    }
 
-    const args = [
-      g_version,
-      realm.addr,
-      realm.port,
-      sess,
-      char.id,
-      char_block.script,
-      (cfg.web_app && cfg.web_app.enable_minimap && "yesmap") || "nomap",
-      char_name,
-      ctype_to_clid[char.type] || -1,
-    ];
-    console.log(realm.addr);
-    const result = child_process.fork("./src/CharacterThread.js", args, {
+    const result = child_process.fork("./src/CharacterThread.js", [], {
       stdio: ["ignore", "pipe", "pipe", "ipc"],
     });
+
     result.stdout.pipe(process.stdout);
     result.stderr.pipe(process.stderr);
     char_block.instance = result;
@@ -233,6 +254,12 @@ function migrate_old_storage(path, localStorage) {
     });
     result.on("message", (m) => {
       switch (m.type) {
+        case "process_ready":
+          safe_send(result, {
+            type: "process_args",
+            arguments: args,
+          });
+          break;
         case "initialized":
           break;
         case "connected":
@@ -247,6 +274,12 @@ function migrate_old_storage(path, localStorage) {
           character_manage[new_char_name] = candidate;
           candidate.enabled = true;
           candidate.realm = m.realm || char_block.realm;
+          if (char_block.typescript && char_block.typescript.length > 0) {
+            candidate.typescript = m.script || char_block.typescript;
+          } else {
+            candidate.script = m.script || char_block.script;
+            candidate.typescript = null;
+          }
           candidate.script = m.script || char_block.script;
           candidate.version = m.version || char_block.version;
           if (candidate.instance) {
