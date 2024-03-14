@@ -1,7 +1,9 @@
 /caracAL.log*
 /logs/*
 !/logs/README.md
-/config*.js
+/config.js
+/config.*.js
+!/config.EXAMPLE.js
 /caracAL.service
 /node_modules/
 /game_files/*
