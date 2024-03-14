@@ -223,8 +223,7 @@ async function make_game(proc_args) {
     if (method != "servers_and_characters") {
       return old_api(method, args, r_args);
     } else {
-      console.log(method, args, r_args);
-      console.debug("filtered s&c call");
+      console.debug("filtered s&c call", method, args, r_args);
     }
   };
   game_context.get_code_function = function (f_name) {
