@@ -76,13 +76,13 @@ function migrate_old_storage(path, localStorage) {
   // const cfg = require("../config");
   const cfg = require(CARACAL_CONFIG_PATH);
 
-  const version = await game_files.ensure_latest(cfg.BASE_URL);
+  const version = await game_files.ensure_latest(cfg.base_url);
   if (cfg.cull_versions) {
     await game_files.cull_versions([version]);
   }
   const sess = process.env.AL_SESSION || cfg.session;
 
-  const my_acc = await account_info(cfg.BASE_URL, sess);
+  const my_acc = await account_info(cfg.base_url, sess);
   const default_realm = my_acc.response.servers[0];
 
   const character_manage = cfg.characters;

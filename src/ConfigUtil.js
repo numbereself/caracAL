@@ -56,7 +56,8 @@ async function prompt_server() {
       type: "input",
       name: "server_url",
       message:
-        "Type in the url of the server, for example http://localhost:8083",
+        "Type in the url of the server, for example http://localhost:8083\n" +
+        "Make sure you trust the server you are connecting to",
       when(answers) {
         return !answers.use_official_server;
       },
@@ -183,7 +184,7 @@ If you want max performance you should choose no.`,
   //console.log({realm,use_bwi,use_minimap,port});
 
   const conf_object = {
-    BASE_URL: base_url,
+    base_url: base_url,
     session: session,
     cull_versions: true,
     enable_TYPECODE: typescript_enabled,
@@ -262,9 +263,12 @@ function make_cfg_string(conf_object = {}) {
 //the session key can be used to take over your account
 //and I would know.(<3 u Nex)
 module.exports = {
+  //base url of the server cluster
+  //official servers are "https://adventure.land"
+  //make sure you trust the servers you are connecting to
+  ${ezpz("base_url", "https://adventure.land")},
   //to obtain a session: show_json(parent.user_id+"-"+parent.user_auth)
   //or just delete the config file and restart caracAL
-  ${ezpz("BASE_URL", "https://adventure.land")},
   ${ezpz("session", "1111111111111111-abc123ABCabc123ABCabc")}, 
   //delete all versions except the two latest ones
   ${ezpz("cull_versions", true)},
