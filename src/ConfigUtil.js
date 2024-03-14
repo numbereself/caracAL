@@ -42,17 +42,15 @@ async function make_auth(base_url, email, password) {
 }
 
 async function prompt_server() {
-  const yesno_choice = [
-    { value: true, name: "Yes" },
-    { value: false, name: "No" },
-  ];
-
   const { use_official_server, server_url } = await inquirer.prompt([
     {
       type: "list",
       name: "use_official_server",
-      message: `Are you playing on the official adventure.land servers?`,
-      choices: yesno_choice,
+      message: `What servers are you playing on?`,
+      choices: [
+        { value: true, name: "Official (Recommended)" },
+        { value: false, name: "Custom" },
+      ],
     },
     {
       type: "input",
@@ -63,16 +61,7 @@ async function prompt_server() {
         return !answers.use_official_server;
       },
     },
-    // TODO: can we validate for a correcct url?
-    // {
-    //   type: "number",
-    //   name: "port",
-    //   message: "What port would you like to run the web panel on?",
-    //   when(answers) {
-    //     return answers.use_bwi;
-    //   },
-    //   default: 924,
-    // },
+    // TODO: can we validate for a correct url?
   ]);
 
   if (use_official_server) {
@@ -113,7 +102,9 @@ Select 'Deploy' when you are done choosing`,
   return enabled_chars;
 }
 
-async function prompt_new_cfg(base_url) {
+async function prompt_new_cfg(configPath) {
+  // prompt official server? or community server?
+  const base_url = await prompt_server();
   let session = null;
   while (!session) {
     console.log("please enter your credentials");
@@ -230,7 +221,7 @@ If you want max performance you should choose no.`,
     }, {}),
   };
 
-  await fs.writeFile(CARACAL_CONFIG_PATH, make_cfg_string(conf_object));
+  await fs.writeFile(configPath, make_cfg_string(conf_object));
 }
 
 const fallback = (first, second) =>
@@ -337,19 +328,14 @@ ${Object.entries(characters)
 `;
 }
 
-let CARACAL_CONFIG_PATH = "./config.js";
 async function interactive(configPath) {
-  CARACAL_CONFIG_PATH = configPath;
-
   try {
-    await fs.access(CARACAL_CONFIG_PATH, constants.R_OK);
+    await fs.access(configPath, constants.R_OK);
     console.log("config file exists. lets get started!");
   } catch (e) {
     console.warn("config file does not exist. lets fix that!");
     console.log("first we need to log you in");
-    // promt official server? or community server?
-    const server_base_url = await prompt_server();
-    await prompt_new_cfg(server_base_url);
+    await prompt_new_cfg(configPath);
     console.log("config file created. lets get started!");
     console.log("(you can change any choices you made in config.js)");
   }
