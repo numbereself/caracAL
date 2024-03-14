@@ -92,8 +92,8 @@ async function ensure_latest(base_url) {
     const fpath = "./game_files/" + version;
     try {
       await fs.mkdir(fpath);
-      const target_files = get_game_files(base_url)
-        .concat(get_runner_files(base_url))
+      const target_files = get_game_files()
+        .concat(get_runner_files())
         //remove duplicates
         .filter(function (item, pos, self) {
           return self.indexOf(item) == pos;
