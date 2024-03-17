@@ -6,7 +6,7 @@ const streamPipeline = promisify(pipeline);
 const fetch = (...args) =>
   import("node-fetch").then(({ default: fetch }) => fetch(...args));
 const path = require("path");
-const { console } = require("./src/LogUtils");
+const { console } = require("./LogUtils");
 
 function get_runner_files() {
   return [
@@ -32,6 +32,7 @@ function get_game_files() {
 }
 
 async function cull_versions(exclusions) {
+  //needs base_url
   const all_versions = await available_versions();
   const target_culls = all_versions.filter(
     (x, i) => i >= 2 && !exclusions.includes(x),
@@ -47,6 +48,7 @@ async function cull_versions(exclusions) {
 }
 
 async function available_versions() {
+  //needs base_url
   return (await fs.readdir("./game_files", { withFileTypes: true }))
     .filter((dirent) => dirent.isDirectory())
     .map((dirent) => dirent.name)
@@ -80,11 +82,14 @@ async function get_latest_version(base_url) {
 }
 
 function locate_game_file(resource, version) {
+  //needs base_url
   return `./game_files/${version}/${path.posix.basename(resource)}`;
 }
 
 async function ensure_latest(base_url) {
+  //needs base_url
   const version = await get_latest_version(base_url);
+  //I should also check if the version is valid and possibly redownload
   if ((await available_versions()).includes(version)) {
     console.log(`version ${version} is already downloaded`);
   } else {

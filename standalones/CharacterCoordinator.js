@@ -1,6 +1,6 @@
 const child_process = require("node:child_process");
 const account_info = require("../account_info");
-const game_files = require("../game_files");
+const game_files = require("../src/game_files");
 const bwi = require("bot-web-interface");
 const monitoring_util = require("../monitoring_util");
 const express = require("express");
