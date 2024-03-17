@@ -228,6 +228,7 @@ function migrate_old_storage(path, localStorage) {
       enable_map: !!(cfg.web_app && cfg.web_app.enable_minimap),
       cname: char_name,
       clid: ctype_to_clid[char.type] || -1,
+      base_url: cfg.base_url || "https://adventure.land",
     };
     if (cfg.enable_TYPECODE) {
       args.typescript_file = char_block.typescript;
