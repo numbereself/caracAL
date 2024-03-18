@@ -5,7 +5,10 @@ const fs = require("fs");
 const { resolve } = require("path");
 
 async function get_webpack_started(cfg) {
-  fs.rmSync("./TYPECODE.out", { recursive: true });
+  if (fs.existsSync("./TYPECODE.out")) {
+    fs.rmSync("./TYPECODE.out", { recursive: true });
+  }
+
   if (cfg.enable_TYPECODE) {
     //TODO make this configurable
     const webpack_log_output = [
