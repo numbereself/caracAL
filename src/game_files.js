@@ -1,4 +1,5 @@
 const fs = require("fs").promises;
+const fs_sync = require("fs");
 const { createWriteStream } = require("fs");
 const { pipeline } = require("stream");
 const { promisify } = require("util");
@@ -7,6 +8,21 @@ const fetch = (...args) =>
   import("node-fetch").then(({ default: fetch }) => fetch(...args));
 const path = require("path");
 const { console } = require("./LogUtils");
+const { URL } = require("url");
+
+function checkFileExists(filepath) {
+  let flag = true;
+  try {
+    fs_sync.accessSync(filepath, fs.constants.F_OK);
+  } catch (e) {
+    flag = false;
+  }
+  return flag;
+}
+
+function getHostname(base_url) {
+  return new URL(base_url).hostname;
+}
 
 function get_runner_files() {
   return [
@@ -31,25 +47,41 @@ function get_game_files() {
   ];
 }
 
-async function cull_versions(exclusions) {
-  //needs base_url
-  const all_versions = await available_versions();
+function get_all_client_files() {
+  return (
+    get_game_files()
+      .concat(get_runner_files())
+      //remove duplicates
+      .filter(function (item, pos, self) {
+        return self.indexOf(item) == pos;
+      })
+  );
+}
+
+async function cull_versions(base_url, exclusions) {
+  const base_host_name = getHostname(base_url);
+  const all_versions = await available_versions(base_url);
   const target_culls = all_versions.filter(
     (x, i) => i >= 2 && !exclusions.includes(x),
   );
   for (let cull of target_culls) {
     try {
       console.log("culling version " + cull);
-      await fs.rmdir("./game_files/" + cull, { recursive: true });
+      await fs.rmdir(`./game_files/${base_host_name}/${cull}`, {
+        recursive: true,
+      });
     } catch (e) {
       console.warn("failed to cull version " + cull, e);
     }
   }
 }
 
-async function available_versions() {
-  //needs base_url
-  return (await fs.readdir("./game_files", { withFileTypes: true }))
+async function available_versions(base_url) {
+  return (
+    await fs.readdir("./game_files/" + getHostname(base_url), {
+      withFileTypes: true,
+    })
+  )
     .filter((dirent) => dirent.isDirectory())
     .map((dirent) => dirent.name)
     .filter((x) => x.match(/^\d+$/))
@@ -81,30 +113,30 @@ async function get_latest_version(base_url) {
   return parseInt(match[1]);
 }
 
-function locate_game_file(resource, version) {
-  //needs base_url
-  return `./game_files/${version}/${path.posix.basename(resource)}`;
+function locate_game_file(base_url, resource, version) {
+  const base_host_name = getHostname(base_url);
+  const file_name = path.posix.basename(resource);
+  return `./game_files/${base_host_name}/${version}/${file_name}`;
 }
 
 async function ensure_latest(base_url) {
-  //needs base_url
+  const base_host_name = getHostname(base_url);
   const version = await get_latest_version(base_url);
-  //I should also check if the version is valid and possibly redownload
-  if ((await available_versions()).includes(version)) {
+  //TODO check if the version has all files and possibly redownload
+  //TODO ensure that the folder we are accessing exists
+  if (!fs_sync.existsSync(`./game_files/${base_host_name}`)) {
+    fs_sync.mkdirSync(`./game_files/${base_host_name}`);
+  }
+  if ((await available_versions(base_url)).includes(version)) {
     console.log(`version ${version} is already downloaded`);
   } else {
     console.log(`downloading version ${version}`);
-    const fpath = "./game_files/" + version;
+    const fpath = `./game_files/${base_host_name}/${version}`;
     try {
       await fs.mkdir(fpath);
-      const target_files = get_game_files()
-        .concat(get_runner_files())
-        //remove duplicates
-        .filter(function (item, pos, self) {
-          return self.indexOf(item) == pos;
-        });
+      const target_files = get_all_client_files();
       const tasks = target_files.map((itm) =>
-        download_file(base_url + itm, locate_game_file(itm, version)),
+        download_file(base_url + itm, locate_game_file(base_url, itm, version)),
       );
       await Promise.all(tasks);
     } catch (e) {

@@ -25,9 +25,8 @@ const html_spoof = `<!DOCTYPE html>
 </body>
 </html>`;
 
-function make_context(upper = null) {
-  const result = new JSDOM(html_spoof, { url: "https://adventure.land/" })
-    .window;
+function make_context(upper = null, base_url) {
+  const result = new JSDOM(html_spoof, { url: base_url }).window;
   //jsdom maked globalThis point to Node global
   //but we want it to be window instead
   result.globalThis = result;
@@ -59,13 +58,15 @@ async function ev_files(locations, context) {
   }
 }
 
-async function make_runner(upper, CODE_file, version, is_typescript) {
+async function make_runner(upper, CODE_file, proc_args, is_typescript) {
   const runner_sources = game_files
     .get_runner_files()
-    .map((f) => game_files.locate_game_file(f, version));
+    .map((f) =>
+      game_files.locate_game_file(proc_args.base_url, f, proc_args.version),
+    );
   console.log("constructing runner instance");
   console.debug("source files:\n%s", runner_sources);
-  const runner_context = make_context(upper);
+  const runner_context = make_context(upper, proc_args.base_url);
   //contents of adventure.land/runner
   //its an html file but not labeled as such
   //TODO in the future i should consider parsing the relevant parts out of the html files directly
@@ -152,11 +153,13 @@ async function make_runner(upper, CODE_file, version, is_typescript) {
 async function make_game(proc_args) {
   const game_sources = game_files
     .get_game_files()
-    .map((f) => game_files.locate_game_file(f, proc_args.version))
+    .map((f) =>
+      game_files.locate_game_file(proc_args.base_url, f, proc_args.version),
+    )
     .concat(["./html_vars.js"]);
   console.log("constructing game instance");
   console.debug("source files:\n%s", game_sources);
-  const game_context = make_context();
+  const game_context = make_context(null, proc_args.base_url);
   game_context.io = io;
   game_context.bowser = {};
   await ev_files(game_sources, game_context);
@@ -206,7 +209,7 @@ async function make_game(proc_args) {
       const runner_context = await make_runner(
         game_context,
         target_script,
-        proc_args.version,
+        proc_args,
         is_typescript,
       );
       extensions.runner = runner_context;
