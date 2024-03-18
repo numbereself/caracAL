@@ -6,8 +6,8 @@ const account_info = require("../account_info");
 const fs = require("fs").promises;
 const { constants } = require("fs");
 
-async function make_auth(email, password) {
-  const raw = await fetch("https://adventure.land/api/signup_or_login", {
+async function make_auth(base_url, email, password) {
+  const raw = await fetch(`${base_url}/api/signup_or_login`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body:
@@ -29,9 +29,9 @@ async function make_auth(email, password) {
     let match;
     req.headers
       .raw()
-      [
-        "set-cookie"
-      ].find((x) => (match = /auth=([0-9]+-[a-zA-Z0-9]+)/.exec(x)));
+      ["set-cookie"].find(
+        (x) => (match = /auth=([0-9]+-[a-zA-Z0-9]+)/.exec(x)),
+      );
     return match[1];
   }
   if (msg.message == "Logged In!") {
@@ -39,6 +39,37 @@ async function make_auth(email, password) {
   }
 
   return null;
+}
+
+async function prompt_server() {
+  const { use_official_server, server_url } = await inquirer.prompt([
+    {
+      type: "list",
+      name: "use_official_server",
+      message: `What servers are you playing on?`,
+      choices: [
+        { value: true, name: "Official (Recommended)" },
+        { value: false, name: "Custom" },
+      ],
+    },
+    {
+      type: "input",
+      name: "server_url",
+      message:
+        "Type in the url of the server, for example http://localhost:8083\n" +
+        "Make sure you trust the server you are connecting to",
+      when(answers) {
+        return !answers.use_official_server;
+      },
+    },
+    // TODO: can we validate for a correct url?
+  ]);
+
+  if (use_official_server) {
+    return "https://adventure.land";
+  } else {
+    return server_url;
+  }
 }
 
 async function prompt_chars(all_chars) {
@@ -72,7 +103,9 @@ Select 'Deploy' when you are done choosing`,
   return enabled_chars;
 }
 
-async function prompt_new_cfg() {
+async function prompt_new_cfg(configPath) {
+  // prompt official server? or community server?
+  const base_url = await prompt_server();
   let session = null;
   while (!session) {
     console.log("please enter your credentials");
@@ -89,12 +122,12 @@ async function prompt_new_cfg() {
         mask: "*",
       },
     ]);
-    session = await make_auth(email, password);
+    session = await make_auth(base_url, email, password);
     if (!session) {
       console.warn("email or password seems to be wrong.");
     }
   }
-  const my_acc = await account_info(session);
+  const my_acc = await account_info(base_url, session);
   my_acc.auto_update = false;
   const all_realms = my_acc.response.servers.map((x) => x.key);
   const all_chars = my_acc.response.characters.map((x) => x.name);
@@ -151,6 +184,7 @@ If you want max performance you should choose no.`,
   //console.log({realm,use_bwi,use_minimap,port});
 
   const conf_object = {
+    base_url: base_url,
     session: session,
     cull_versions: true,
     enable_TYPECODE: typescript_enabled,
@@ -188,7 +222,7 @@ If you want max performance you should choose no.`,
     }, {}),
   };
 
-  await fs.writeFile("./config.js", make_cfg_string(conf_object));
+  await fs.writeFile(configPath, make_cfg_string(conf_object));
 }
 
 const fallback = (first, second) =>
@@ -229,6 +263,10 @@ function make_cfg_string(conf_object = {}) {
 //the session key can be used to take over your account
 //and I would know.(<3 u Nex)
 module.exports = {
+  //base url of the server cluster
+  //official servers are "https://adventure.land"
+  //make sure you trust the servers you are connecting to
+  ${ezpz("base_url", "https://adventure.land")},
   //to obtain a session: show_json(parent.user_id+"-"+parent.user_auth)
   //or just delete the config file and restart caracAL
   ${ezpz("session", "1111111111111111-abc123ABCabc123ABCabc")}, 
@@ -294,14 +332,14 @@ ${Object.entries(characters)
 `;
 }
 
-async function interactive() {
+async function interactive(configPath) {
   try {
-    await fs.access("./config.js", constants.R_OK);
+    await fs.access(configPath, constants.R_OK);
     console.log("config file exists. lets get started!");
   } catch (e) {
     console.warn("config file does not exist. lets fix that!");
     console.log("first we need to log you in");
-    await prompt_new_cfg();
+    await prompt_new_cfg(configPath);
     console.log("config file created. lets get started!");
     console.log("(you can change any choices you made in config.js)");
   }

@@ -6,17 +6,14 @@ class Info {
 
   async updateInfo() {
     console.log("updating account info");
-    const raw = await fetch(
-      "https://adventure.land/api/servers_and_characters",
-      {
-        method: "POST",
-        headers: {
-          Cookie: "auth=" + this.session,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: "method=servers_and_characters",
+    const raw = await fetch(`${this.base_url}/api/servers_and_characters`, {
+      method: "POST",
+      headers: {
+        Cookie: "auth=" + this.session,
+        "Content-Type": "application/x-www-form-urlencoded",
       },
-    );
+      body: "method=servers_and_characters",
+    });
     if (!raw.ok) {
       throw new Error(`failed to update account info: ${raw.statusText}`);
     }
@@ -38,8 +35,9 @@ class Info {
     }
   }
 
-  static async build(session) {
+  static async build(base_url, session) {
     const result = new Info();
+    result.base_url = base_url;
     result.session = session;
     result.listeners = [];
     result.auto_update = true;

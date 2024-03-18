@@ -1,6 +1,6 @@
 const child_process = require("node:child_process");
 const account_info = require("../account_info");
-const game_files = require("../game_files");
+const game_files = require("../src/game_files");
 const bwi = require("bot-web-interface");
 const monitoring_util = require("../monitoring_util");
 const express = require("express");
@@ -13,6 +13,10 @@ const {
 const { log, console, ctype_to_clid } = require("../src/LogUtils");
 
 const FileStoredKeyValues = require("../src/FileStoredKeyValues");
+
+// CharacterCoordinator is started in a new process, so we forward the config file from the previous process
+const args = process.argv.slice(2);
+const CARACAL_CONFIG_PATH = args[0];
 
 //TODO check for invalid session
 //TODO improve termination
@@ -69,14 +73,17 @@ function migrate_old_storage(path, localStorage) {
   localStorage.set("caracAL", "Yeah");
   sessionStorage.set("caracAL", "Yup");
 
-  const version = await game_files.ensure_latest();
+  // const cfg = require("../config");
+  const cfg = require(CARACAL_CONFIG_PATH);
+  const base_url = cfg.base_url || "https://adventure.land";
 
-  const cfg = require("../config");
+  const version = await game_files.ensure_latest(base_url);
   if (cfg.cull_versions) {
-    await game_files.cull_versions([version]);
+    await game_files.cull_versions(base_url, [version]);
   }
   const sess = process.env.AL_SESSION || cfg.session;
-  const my_acc = await account_info(sess);
+
+  const my_acc = await account_info(base_url, sess);
   const default_realm = my_acc.response.servers[0];
 
   const character_manage = cfg.characters;
@@ -222,6 +229,7 @@ function migrate_old_storage(path, localStorage) {
       enable_map: !!(cfg.web_app && cfg.web_app.enable_minimap),
       cname: char_name,
       clid: ctype_to_clid[char.type] || -1,
+      base_url: cfg.base_url || "https://adventure.land",
     };
     if (cfg.enable_TYPECODE) {
       args.typescript_file = char_block.typescript;
