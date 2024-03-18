@@ -124,26 +124,24 @@ async function ensure_latest(base_url) {
   const version = await get_latest_version(base_url);
   //TODO check if the version has all files and possibly redownload
   //TODO ensure that the folder we are accessing exists
-  if (!fs_sync.existsSync(`./game_files/${base_host_name}`)) {
-    fs_sync.mkdirSync(`./game_files/${base_host_name}`);
-  }
-  if ((await available_versions(base_url)).includes(version)) {
-    console.log(`version ${version} is already downloaded`);
+
+  const fpath = `./game_files/${base_host_name}/${version}`;
+
+  await fs.mkdir(fpath, { recursive: true });
+  const target_files = get_all_client_files().filter(
+    (resource) =>
+      !checkFileExists(locate_game_file(base_url, resource, version)),
+  );
+  if (target_files.length == 0) {
+    console.log("all files for version " + version + " are present");
   } else {
-    console.log(`downloading version ${version}`);
-    const fpath = `./game_files/${base_host_name}/${version}`;
-    try {
-      await fs.mkdir(fpath);
-      const target_files = get_all_client_files();
-      const tasks = target_files.map((itm) =>
-        download_file(base_url + itm, locate_game_file(base_url, itm, version)),
-      );
-      await Promise.all(tasks);
-    } catch (e) {
-      await fs.rmdir(fpath, { recursive: true });
-      throw e;
-    }
+    console.log("downloading game files for version " + version, target_files);
   }
+  const tasks = target_files.map((itm) =>
+    download_file(base_url + itm, locate_game_file(base_url, itm, version)),
+  );
+  await Promise.all(tasks);
+
   return version;
 }
 exports.cull_versions = cull_versions;
