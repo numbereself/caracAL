@@ -4,6 +4,10 @@ A Node.js client for [adventure.land](https://adventure.land/ "Adventure Land")
 
 ## Recent Versions
 
+#### 2024-06-07
+
+Improve performance when switching servers
+
 ### Typescript
 
 #### 2024-03-10

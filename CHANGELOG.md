@@ -4,6 +4,10 @@ Here you can review the historic development of caracAL.
 
 I do not bundle releases but with the timestamp you can usually find the relevant git commit.
 
+#### 2024-06-07
+
+Improve performance when switching servers
+
 ### Typescript
 
 #### 2024-03-10
