@@ -197,6 +197,10 @@ async function make_game(proc_args) {
   game_context.new_game_logic = function () {
     old_ng_logic();
     clearTimeout(reload_task);
+    //people reported bad performance when switching maps
+    //and this allegedly fixes it.
+    vm.runInContext("pause()", game_context);
+
     const is_typescript =
       proc_args.typescript_file && proc_args.typescript_file.length > 0;
     const target_script = is_typescript
