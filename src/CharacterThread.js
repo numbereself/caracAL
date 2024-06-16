@@ -6,8 +6,8 @@ const node_query = require("jquery");
 const game_files = require("./game_files");
 const fetch = (...args) =>
   import("node-fetch").then(({ default: fetch }) => fetch(...args));
-const monitoring_util = require("../monitoring_util");
-const ipc_storage = require("../ipcStorage");
+const monitoring_util = require("./monitoring_util");
+const ipc_storage = require("./ipcStorage");
 
 const LogUtils = require("./LogUtils");
 const { console } = LogUtils;
@@ -156,7 +156,7 @@ async function make_game(proc_args) {
     .map((f) =>
       game_files.locate_game_file(proc_args.base_url, f, proc_args.version),
     )
-    .concat(["./html_vars.js"]);
+    .concat(["./src/html_vars.js"]);
   console.log("constructing game instance");
   console.debug("source files:\n%s", game_sources);
   const game_context = make_context(null, proc_args.base_url);

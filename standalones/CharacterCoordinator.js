@@ -2,8 +2,10 @@ const child_process = require("node:child_process");
 const account_info = require("../account_info");
 const game_files = require("../src/game_files");
 const bwi = require("bot-web-interface");
-const monitoring_util = require("../monitoring_util");
+const monitoring_util = require("../src/monitoring_util");
 const express = require("express");
+const path = require("path");
+
 const fs_regular = require("node:fs");
 const {
   LOCALSTORAGE_PATH,
@@ -234,9 +236,16 @@ function migrate_old_storage(path, localStorage) {
     if (cfg.enable_TYPECODE) {
       args.typescript_file = char_block.typescript;
     }
-
     const result = child_process.fork("./src/CharacterThread.js", [], {
       stdio: ["ignore", "pipe", "pipe", "ipc"],
+      execArgv: [
+        "--experimental-permission",
+        `--allow-fs-read=${path.resolve("./src")}`,
+        `--allow-fs-read=${path.resolve("./node_modules")}`,
+        `--allow-fs-read=${path.resolve("./game_files")}`,
+        `--allow-fs-read=${path.resolve("./CODE")}`,
+        `--allow-fs-read=${path.resolve("./TYPECODE.out")}`,
+      ],
     });
 
     result.stdout.pipe(process.stdout);
