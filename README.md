@@ -4,9 +4,9 @@ A Node.js client for [adventure.land](https://adventure.land/ "Adventure Land")
 
 ## Recent Versions
 
-#### 2024-06-07
+#### 2024-07-12
 
-Improve performance when switching servers
+Fixed missing typeScript bindings for caracAL added types
 
 ### Typescript
 
