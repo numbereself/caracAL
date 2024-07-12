@@ -1,5 +1,9 @@
 {
-  "include": ["./TYPECODE/", "./node_modules/typed-adventureland"],
+  "include": [
+    "./TYPECODE/",
+    "./node_modules/typed-adventureland",
+    "./src/ts_defs"
+  ],
   "compilerOptions": {
     /* Visit https://aka.ms/tsconfig to read more about this file */
 
