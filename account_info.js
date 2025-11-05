@@ -5,7 +5,7 @@ class Info {
   constructor() {}
 
   async updateInfo() {
-    console.log("updating account info");
+    console.debug("updating account info");
     const raw = await fetch(
       "https://adventure.land/api/servers_and_characters",
       {
@@ -21,7 +21,7 @@ class Info {
       throw new Error(`failed to update account info: ${raw.statusText}`);
     }
     const res = (await raw.json())[0];
-    console.log(
+    console.debug(
       `found ${res.servers.length} servers and ${res.characters.length} characters`,
     );
     this.listeners.forEach((func) => func(res));

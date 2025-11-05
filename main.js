@@ -4,7 +4,28 @@ const StreamMultiplexer = require("./src/StreamMultiplexer");
 const fs = require("fs");
 
 async function get_webpack_started(cfg) {
-  fs.rmSync("./TYPECODE.out", { recursive: true });
+  // Clean TYPECODE.out directory but preserve .gitignore
+  try {
+    const gitignorePath = "./TYPECODE.out/.gitignore";
+    let gitignoreContent = null;
+
+    // Save .gitignore content if it exists
+    if (fs.existsSync(gitignorePath)) {
+      gitignoreContent = fs.readFileSync(gitignorePath, "utf8");
+    }
+
+    // Remove the directory
+    fs.rmSync("./TYPECODE.out", { recursive: true, force: true });
+
+    // Recreate directory and restore .gitignore
+    if (gitignoreContent) {
+      fs.mkdirSync("./TYPECODE.out", { recursive: true });
+      fs.writeFileSync(gitignorePath, gitignoreContent);
+    }
+  } catch (err) {
+    // Directory might not exist, that's okay
+  }
+
   if (cfg.enable_TYPECODE) {
     //TODO make this configurable
     const webpack_log_output = [

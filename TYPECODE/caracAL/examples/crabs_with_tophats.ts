@@ -1,3 +1,7 @@
+/// <reference types="typed-adventureland" />
+
+import type { ItemKey } from "typed-adventureland";
+
 const mon_type = "crab";
 
 function smart_potion_logic() {
@@ -5,24 +9,26 @@ function smart_potion_logic() {
 
   if (is_on_cooldown("use_hp")) return;
 
-  function can_consume_fully(pot: String) {
+  function can_consume_fully(pot: string) {
     if ("regen_hp" === pot) return character.max_hp - character.hp >= 50;
     if ("regen_mp" === pot) return character.max_mp - character.mp >= 100;
+    const item = G.items[pot as ItemKey];
+    if (!item || !("gives" in item) || !item.gives) return false;
     if (pot.startsWith("hp")) {
-      return character.max_hp - character.hp >= G.items[pot].gives[0][1];
+      return character.max_hp - character.hp >= item.gives[0][1];
     } else {
-      return character.max_mp - character.mp >= G.items[pot].gives[0][1];
+      return character.max_mp - character.mp >= item.gives[0][1];
     }
   }
-  function choose_potion(priorities: Array<String>, fallback: String = "") {
-    let using_slot;
+  function choose_potion(priorities: Array<string>, fallback: string = "") {
+    let using_slot: number | undefined;
     for (let pot of priorities) {
-      if (can_consume_fully(pot) && (using_slot = locate_item(pot)) >= 0) {
+      if (can_consume_fully(pot) && (using_slot = locate_item(pot as ItemKey)) >= 0) {
         equip(using_slot);
         return;
       }
     }
-    if (fallback && can_consume_fully(fallback)) use_skill(fallback);
+    if (fallback && can_consume_fully(fallback)) use_skill(fallback as any);
   }
   const hp_critical = character.hp / character.max_hp <= 0.5;
   const mp_critical = character.mp / character.max_mp <= 0.2;
