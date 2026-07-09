@@ -1,9 +1,11 @@
 const child_process = require("node:child_process");
 const account_info = require("../account_info");
-const game_files = require("../game_files");
+const game_files = require("../src/game_files");
 const bwi = require("bot-web-interface");
-const monitoring_util = require("../monitoring_util");
+const monitoring_util = require("../src/monitoring_util");
 const express = require("express");
+const path = require("path");
+
 const fs_regular = require("node:fs");
 const {
   LOCALSTORAGE_PATH,
@@ -13,6 +15,10 @@ const {
 const { log, console, ctype_to_clid } = require("../src/LogUtils");
 
 const FileStoredKeyValues = require("../src/FileStoredKeyValues");
+
+// CharacterCoordinator is started in a new process, so we forward the config file from the previous process
+const args = process.argv.slice(2);
+const CARACAL_CONFIG_PATH = args[0];
 
 //TODO check for invalid session
 //TODO improve termination
@@ -69,14 +75,17 @@ function migrate_old_storage(path, localStorage) {
   localStorage.set("caracAL", "Yeah");
   sessionStorage.set("caracAL", "Yup");
 
-  const version = await game_files.ensure_latest();
+  // const cfg = require("../config");
+  const cfg = require(CARACAL_CONFIG_PATH);
+  const base_url = cfg.base_url || "https://adventure.land";
 
-  const cfg = require("../config");
+  const version = await game_files.ensure_latest(base_url);
   if (cfg.cull_versions) {
-    await game_files.cull_versions([version]);
+    await game_files.cull_versions(base_url, [version]);
   }
   const sess = process.env.AL_SESSION || cfg.session;
-  const my_acc = await account_info(sess);
+
+  const my_acc = await account_info(base_url, sess);
   const default_realm = my_acc.response.servers[0];
 
   const character_manage = cfg.characters;
@@ -214,7 +223,8 @@ function migrate_old_storage(path, localStorage) {
     );
     const args = {
       version: g_version,
-      realm_addr: realm.addr,
+      realm_address: realm.address ?? realm.addr,
+      realm_path: realm.path ?? "",
       realm_port: realm.port,
       sess: sess,
       cid: char.id,
@@ -222,13 +232,21 @@ function migrate_old_storage(path, localStorage) {
       enable_map: !!(cfg.web_app && cfg.web_app.enable_minimap),
       cname: char_name,
       clid: ctype_to_clid[char.type] || -1,
+      base_url: cfg.base_url || "https://adventure.land",
     };
     if (cfg.enable_TYPECODE) {
       args.typescript_file = char_block.typescript;
     }
-
     const result = child_process.fork("./src/CharacterThread.js", [], {
       stdio: ["ignore", "pipe", "pipe", "ipc"],
+      execArgv: [
+        "--experimental-permission",
+        `--allow-fs-read=${path.resolve("./src")}`,
+        `--allow-fs-read=${path.resolve("./node_modules")}`,
+        `--allow-fs-read=${path.resolve("./game_files")}`,
+        `--allow-fs-read=${path.resolve("./CODE")}`,
+        `--allow-fs-read=${path.resolve("./TYPECODE.out")}`,
+      ],
     });
 
     result.stdout.pipe(process.stdout);

@@ -1,6 +1,6 @@
 const prettyMilliseconds = require("pretty-ms");
 const { PNG } = require("pngjs");
-const { STAT_BEAT_INTERVAL } = require("./src/CONSTANTS.js");
+const { STAT_BEAT_INTERVAL } = require("./CONSTANTS.js");
 const { max, min, abs, round, floor } = Math;
 
 function humanize_int(num, digits) {
