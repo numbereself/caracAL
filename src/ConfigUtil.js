@@ -77,7 +77,7 @@ async function prompt_server() {
   } else {
     if (server_url.startsWith("http://")) {
       console.warn(
-        "Warning: HTTP custom servers may have socket connection issues. HTTPS is recommended.",
+        "HTTP custom server: sockets use ws:// (matched to base_url). HTTPS still preferred for public hosts.",
       );
     }
     return server_url;

@@ -232,10 +232,22 @@ async function make_game(proc_args) {
   game_context.Dev = "";
   game_context.Place = "code";
   const realmHost = proc_args.realm_address ?? proc_args.realm_addr;
-  game_context.server_address = realmHost.startsWith("wss://")
-    ? realmHost
-    : "wss://" + realmHost;
-  game_context.server_path = proc_args.realm_path ?? "";
+  // Browser uses bare host with location.protocol; Node/JSDOM socket.io needs an absolute ws(s) URL.
+  // Always forcing wss:// breaks local HTTP gameservers.
+  if (!realmHost) {
+    throw new Error(
+      "realm address missing from servers_and_characters (expected address/addr)",
+    );
+  }
+  if (/^wss?:\/\//i.test(realmHost)) {
+    game_context.server_address = realmHost;
+  } else if ((proc_args.base_url || "").startsWith("http://")) {
+    game_context.server_address = "ws://" + realmHost;
+  } else {
+    game_context.server_address = "wss://" + realmHost;
+  }
+  // Empty path must still fall back — `??` alone treats "" as intentional.
+  game_context.server_path = proc_args.realm_path || "/socket.io/";
   if (proc_args.realm_port) {
     game_context.server_port = proc_args.realm_port;
   }

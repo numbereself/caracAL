@@ -237,16 +237,21 @@ function migrate_old_storage(path, localStorage) {
     if (cfg.enable_TYPECODE) {
       args.typescript_file = char_block.typescript;
     }
+    // Node 24 dropped the --experimental-permission alias; use stable --permission.
+    const nodeMajor = Number.parseInt(process.versions.node.split(".")[0], 10);
+    const permissionFlag =
+      nodeMajor >= 24 ? "--permission" : "--experimental-permission";
+    const permissionArgv = [
+      permissionFlag,
+      `--allow-fs-read=${path.resolve("./src")}`,
+      `--allow-fs-read=${path.resolve("./node_modules")}`,
+      `--allow-fs-read=${path.resolve("./game_files")}`,
+      `--allow-fs-read=${path.resolve("./CODE")}`,
+      `--allow-fs-read=${path.resolve("./TYPECODE.out")}`,
+    ];
     const result = child_process.fork("./src/CharacterThread.js", [], {
       stdio: ["ignore", "pipe", "pipe", "ipc"],
-      execArgv: [
-        "--experimental-permission",
-        `--allow-fs-read=${path.resolve("./src")}`,
-        `--allow-fs-read=${path.resolve("./node_modules")}`,
-        `--allow-fs-read=${path.resolve("./game_files")}`,
-        `--allow-fs-read=${path.resolve("./CODE")}`,
-        `--allow-fs-read=${path.resolve("./TYPECODE.out")}`,
-      ],
+      execArgv: permissionArgv,
     });
 
     result.stdout.pipe(process.stdout);
