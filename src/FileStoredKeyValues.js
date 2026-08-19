@@ -50,13 +50,19 @@ class FileStoredKeyValues {
     this.#handle = fs.openSync(this.#main_path, "a+");
     const handle_contents = fs.readFileSync(this.#handle, "utf8").split("\n");
     for (let line of handle_contents) {
-      if (line.length > 0) {
-        const [key, value] = entries(JSON.parse(line))[0];
+      const trimmed = line.trim();
+      if (trimmed.length === 0) continue;
+      try {
+        const [key, value] = entries(JSON.parse(trimmed))[0];
         if (value === null) {
           this.#backend.delete(key);
         } else {
           this.#backend.set(key, value);
         }
+      } catch (err) {
+        console.error(
+          `FileStoredKeyValues: skipping corrupt line (${err.message}): ${trimmed.slice(0, 120)}`,
+        );
       }
     }
   }
@@ -69,9 +75,10 @@ class FileStoredKeyValues {
     for (let [key, value] of this.#backend.entries()) {
       k_v_list.push(JSON.stringify({ [key]: value }) + "\n");
     }
-    fs.writeFileSync(this.#replacer_path, k_v_list.join(""), {
-      encoding: "utf8",
-    });
+    const fd = fs.openSync(this.#replacer_path, "w");
+    fs.writeFileSync(fd, k_v_list.join(""), { encoding: "utf8" });
+    fs.fsyncSync(fd);
+    fs.closeSync(fd);
     fs.closeSync(this.#handle);
     fs.unlinkSync(this.#main_path);
     fs.renameSync(this.#replacer_path, this.#main_path);
@@ -81,6 +88,11 @@ class FileStoredKeyValues {
   close() {
     clearInterval(this.#refactorTask);
     fs.closeSync(this.#handle);
+  }
+
+  shutdown() {
+    clearInterval(this.#refactorTask);
+    this.refactor();
   }
 
   //i dont guarantee functionality if you set values that are not strings
