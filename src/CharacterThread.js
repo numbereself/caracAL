@@ -59,6 +59,41 @@ async function ev_files(locations, context) {
   }
 }
 
+//When an entity's skin changes, adopt_soft_properties() reassigns element.skin
+//but skips the new_sprite(element,"full","renew") that generates textures for
+//it under no_graphics, so the next draw() -> update_sprite() -> set_texture()
+//reads textures[skin][i][j] off undefined. That throw lands before draw()
+//reschedules itself, so the loop only comes back through the 250ms watchdog -
+//and then throws again on every pass. Renew the sprite ourselves instead.
+function patch_no_graphics_skin_change(context) {
+  vm.runInContext(
+    `
+    (function () {
+      const original = adopt_soft_properties;
+      adopt_soft_properties = function (element, data) {
+        const previous = element.skin;
+        original(element, data);
+        //only the branch guarded on stype "full" can reassign skin
+        if (element.stype != "full" || element.skin == previous) return;
+        if (textures[element.skin]) return;
+        try {
+          //the same sanitizing the graphics path does before it renews
+          if (!XYWH[element.skin]) element.skin = "naked";
+          //no restore_dimensions() - no_graphics textures carry no dimensions
+          new_sprite(element, "full", "renew");
+        } catch (exception) {
+          console.warn(
+            "failed to generate textures for skin " + element.skin,
+            exception,
+          );
+        }
+      };
+    })();
+    `,
+    context,
+  );
+}
+
 async function make_runner(upper, CODE_file, version, is_typescript) {
   const runner_sources = game_files
     .get_runner_files()
@@ -71,7 +106,33 @@ async function make_runner(upper, CODE_file, version, is_typescript) {
   //TODO in the future i should consider parsing the relevant parts out of the html files directly
   //for the runners as well as the instances
   vm.runInContext(
-    "var active=false,catch_errors=true,is_code=1,is_server=0,is_game=0,is_bot=parent.is_bot,is_cli=parent.is_cli,is_sdk=parent.is_sdk;",
+    `
+    var active=false,catch_errors=true,is_code=1,is_server=0,is_game=0,is_bot=parent.is_bot,is_cli=parent.is_cli,is_sdk=parent.is_sdk;
+    var Place='game';
+    var transporting=false;var Dev=''; 
+    var Local='';
+    `,
+    runner_context,
+  );
+
+  // Avoid defining duplicate String methods in the same VM
+  vm.runInContext(
+    `
+  (function() {
+    const originalDefine = Object.defineProperty;
+
+    Object.defineProperty = function(obj, prop, descriptor) {
+      if (
+        obj === String.prototype &&
+        prop === "hashCode" &&
+        Object.prototype.hasOwnProperty.call(String.prototype, "hashCode")
+      ) {
+        return obj; // ignore duplicate
+      }
+      return originalDefine(obj, prop, descriptor);
+    };
+  })();
+`,
     runner_context,
   );
   await ev_files(runner_sources, runner_context);
@@ -106,9 +167,6 @@ async function make_runner(upper, CODE_file, version, is_typescript) {
         console.log("terminating self");
         vm.runInContext("on_destroy()", runner_context);
         process.exit();
-        //vscode says this is unreachable.
-        //with how whack node is better be safe
-        break;
     }
   });
 
@@ -160,8 +218,10 @@ async function make_game(proc_args) {
   game_context.io = io;
   game_context.bowser = {};
   await ev_files(game_sources, game_context);
+  patch_no_graphics_skin_change(game_context);
   game_context.VERSION = "" + game_context.G.version;
-  game_context.server_addr = proc_args.realm_addr;
+  game_context.server_address = "wss://" + proc_args.realm_address;
+  game_context.server_path = proc_args.realm_path;
   game_context.server_port = proc_args.realm_port;
   game_context.user_id = proc_args.sess.split("-")[0];
   game_context.user_auth = proc_args.sess.split("-")[1];
