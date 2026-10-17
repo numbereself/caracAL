@@ -9,29 +9,36 @@ const { constants } = require("fs");
 async function make_auth(email, password) {
   const raw = await fetch("https://adventure.land/api/signup_or_login", {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body:
-      'arguments={"email":"' +
-      encodeURIComponent(email) +
-      '","password":"' +
-      encodeURIComponent(password) +
-      '","only_login":true}&method=signup_or_login',
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email,
+      password,
+      only_login: true,
+    }),
   });
   if (!raw.ok) {
     throw new Error(`failed to call login api: ${raw.statusText}`);
   }
-  const msg = (await raw.json()).find((x) => x.message);
+  const data = await raw.json();
+
+  const msg = data.infs?.find((x) => x.type === "message");
+
   if (!msg) {
-    throw new Error(`unexpected login api response`);
+    throw new Error("unexpected login api response");
   }
 
   function find_auth(req) {
+    const cookies = req.headers.raw()["set-cookie"];
+
     let match;
-    req.headers
-      .raw()
-      [
-        "set-cookie"
-      ].find((x) => (match = /auth=([0-9]+-[a-zA-Z0-9]+)/.exec(x)));
+    cookies.find((x) => (match = /auth=([^;]+)/.exec(x)));
+
+    if (!match) {
+      throw new Error("auth cookie not found");
+    }
+
     return match[1];
   }
   if (msg.message == "Logged In!") {

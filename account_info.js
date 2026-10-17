@@ -12,15 +12,15 @@ class Info {
         method: "POST",
         headers: {
           Cookie: "auth=" + this.session,
-          "Content-Type": "application/x-www-form-urlencoded",
+          "Content-Type": "application/json",
         },
-        body: "method=servers_and_characters",
       },
     );
     if (!raw.ok) {
       throw new Error(`failed to update account info: ${raw.statusText}`);
     }
-    const res = (await raw.json())[0];
+    const data = await raw.json();
+    const res = data.infs[0];
     console.log(
       `found ${res.servers.length} servers and ${res.characters.length} characters`,
     );
