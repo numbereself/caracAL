@@ -170,7 +170,7 @@ If you want max performance you should choose no.`,
         "--keep",
         "3",
         "--size",
-        "1500000",
+        "4500000",
       ],
       ["node", "./standalones/LogPrinter.js"],
     ],
@@ -283,19 +283,18 @@ module.exports = {
   },
   characters: {
 ${Object.entries(characters)
-  .map(
-    ([cname, cconf]) => `    ${JSON.stringify(cname)}:{
+      .map(
+        ([cname, cconf]) => `    ${JSON.stringify(cname)}:{
       realm: ${fallback(cconf.realm, "EUI")},
-      ${
-        cconf.typescript
-          ? "typescript: " + JSON.stringify(cconf.typescript)
-          : "script: " + fallback(cconf.script, "caracAL/examples/crabs.js")
-      },
+      ${cconf.typescript
+            ? "typescript: " + JSON.stringify(cconf.typescript)
+            : "script: " + fallback(cconf.script, "caracAL/examples/crabs.js")
+          },
       enabled: ${fallback(cconf.enabled, false)},
       version: ${fallback(cconf.version, 0)}
     }`,
-  )
-  .join(",\n")}
+      )
+      .join(",\n")}
   }
 };
 `;

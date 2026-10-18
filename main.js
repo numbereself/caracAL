@@ -20,7 +20,7 @@ async function get_webpack_started(cfg) {
         "--keep",
         "3",
         "--size",
-        "1500000",
+        "4500000",
       ],
       null,
     ];
