@@ -4,6 +4,17 @@ A Node.js client for [adventure.land](https://adventure.land/ "Adventure Land")
 
 ## Recent Versions
 
+### pnpm and Node.js 24
+
+#### 2026-10-18
+
+**Breaking installation change:** We are now using pnpm instead of
+npm, and Node.js 24 instead of the previously documented
+Node.js 14 setup.
+
+After upgrading, use pnpm instead of npm for dependency installation and
+updates. Refer to [Upgrading from a git installation](./README.md#upgrading-from-a-git-installation).
+
 ### caracAL for MongoDB Edition
 
 #### 2026-10-17
