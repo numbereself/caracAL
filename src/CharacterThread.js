@@ -58,6 +58,41 @@ async function ev_files(locations, context) {
   }
 }
 
+//When an entity's skin changes, adopt_soft_properties() reassigns element.skin
+//but skips the new_sprite(element,"full","renew") that generates textures for
+//it under no_graphics, so the next draw() -> update_sprite() -> set_texture()
+//reads textures[skin][i][j] off undefined. That throw lands before draw()
+//reschedules itself, so the loop only comes back through the 250ms watchdog -
+//and then throws again on every pass. Renew the sprite ourselves instead.
+function patch_no_graphics_skin_change(context) {
+  vm.runInContext(
+    `
+    (function () {
+      const original = adopt_soft_properties;
+      adopt_soft_properties = function (element, data) {
+        const previous = element.skin;
+        original(element, data);
+        //only the branch guarded on stype "full" can reassign skin
+        if (element.stype != "full" || element.skin == previous) return;
+        if (textures[element.skin]) return;
+        try {
+          //the same sanitizing the graphics path does before it renews
+          if (!XYWH[element.skin]) element.skin = "naked";
+          //no restore_dimensions() - no_graphics textures carry no dimensions
+          new_sprite(element, "full", "renew");
+        } catch (exception) {
+          console.warn(
+            "failed to generate textures for skin " + element.skin,
+            exception,
+          );
+        }
+      };
+    })();
+    `,
+    context,
+  );
+}
+
 async function make_runner(upper, CODE_file, proc_args, is_typescript) {
   const runner_sources = game_files
     .get_runner_files()
@@ -75,12 +110,13 @@ async function make_runner(upper, CODE_file, proc_args, is_typescript) {
     `
     var active=false,catch_errors=true,is_code=1,is_server=0,is_game=0,is_bot=parent.is_bot,is_cli=parent.is_cli,is_sdk=parent.is_sdk;
     var Place='game';
-    var transporting=false;var Dev='';
+    var transporting=false;var Dev=''; 
     var Local='';
     `,
     runner_context,
   );
 
+  // Avoid defining duplicate String methods in the same VM
   vm.runInContext(
     `
   (function() {
@@ -92,7 +128,7 @@ async function make_runner(upper, CODE_file, proc_args, is_typescript) {
         prop === "hashCode" &&
         Object.prototype.hasOwnProperty.call(String.prototype, "hashCode")
       ) {
-        return obj;
+        return obj; // ignore duplicate
       }
       return originalDefine(obj, prop, descriptor);
     };
@@ -132,9 +168,6 @@ async function make_runner(upper, CODE_file, proc_args, is_typescript) {
         console.log("terminating self");
         vm.runInContext("on_destroy()", runner_context);
         process.exit();
-        //vscode says this is unreachable.
-        //with how whack node is better be safe
-        break;
     }
   });
 
@@ -176,18 +209,24 @@ async function make_runner(upper, CODE_file, proc_args, is_typescript) {
 }
 
 async function make_game(proc_args) {
-  const game_sources = game_files
-    .get_game_files()
-    .map((f) =>
-      game_files.locate_game_file(proc_args.base_url, f, proc_args.version),
+  //the game files read html_vars.js as they evaluate, html_init.js calls back
+  //into them - hence the order
+  const game_sources = ["./src/html_vars.js"]
+    .concat(
+      game_files
+        .get_game_files()
+        .map((f) =>
+          game_files.locate_game_file(proc_args.base_url, f, proc_args.version),
+        ),
     )
-    .concat(["./src/html_vars.js"]);
+    .concat(["./src/html_init.js"]);
   console.log("constructing game instance");
   console.debug("source files:\n%s", game_sources);
   const game_context = make_context(null, proc_args.base_url);
   game_context.io = io;
   game_context.bowser = {};
   await ev_files(game_sources, game_context);
+  patch_no_graphics_skin_change(game_context);
   game_context.VERSION = "" + game_context.G.version;
   game_context.Local = "";
   game_context.Dev = "";

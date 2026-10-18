@@ -26,19 +26,30 @@ function getHostname(base_url) {
 
 function get_runner_files() {
   return [
+    "/js/old_common_functions.js",
     "/js/common_functions.js",
     "/js/runner_functions.js",
     "/js/runner_compat.js",
   ];
 }
+
 function get_game_files() {
   return [
     "/js/pixi/fake/pixi.min.js",
     "/js/libraries/combined.js",
     "/js/codemirror/fake/codemirror.js",
-
+    "/js/old_common_functions.js",
     "/js/common_functions.js",
     "/js/functions.js",
+    "/js/generated_zones.js",
+    "/js/entity_animations.js",
+    "/js/npc_obstruction_hint.js",
+    "/js/tavern_poker.js",
+    "/js/tavern_slots.js",
+    "/js/tavern_wheel.js",
+    "/js/merrit_stand_notice.js",
+    "/js/phrases.js",
+    "/phrases/en.js",
     "/js/game.js",
     "/js/html.js",
     "/js/payments.js",
