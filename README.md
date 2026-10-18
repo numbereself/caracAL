@@ -4,24 +4,15 @@ A Node.js client for [adventure.land](https://adventure.land/ "Adventure Land")
 
 ## Recent Versions
 
-#### 2026-01-23
+### caracAL for MongoDB Edition
 
-Fixed ENOENT error for nonexistent TYPECODE.out file
+#### 2026-10-17
 
-### Typescript
+Updated compatibility with Adventure Land's MongoDB-backed servers, thanks to [mrdiamond12312](https://github.com/mrdiamond12312) in [PR #21](https://github.com/numbereself/caracAL/pull/21).
 
-#### 2024-03-10
-
-##### npm install required
-
-This update introduces the ability to run TypeScript directly in caracAL.
-
-TypeScript is much similar to JavaScript but allows code to be much safer in development and enables better autocompletion in IDEs.
-
-TypeScript is opt-in. If you would like to continue working with JavaScript you can. If you already have a working pipeline with TypeScript it will continue to work.
-
-caracAL also allows you to expose your TypeScript creations via webserver.
-You can use this capability to load fully bundled versions of your code into other places, such as the official client while developing.
+- Updated login, account information and server connections for the new APIs.
+- Added newly required game files and fixed game and script initialization compatibility.
+- Fixed runtime errors caused by changes in the game client.
 
 ### Upgrading from a git installation
 
