@@ -2,6 +2,7 @@ const { COORDINATOR_MODULE_PATH } = require("./src/CONSTANTS");
 const ConfigUtil = require("./src/ConfigUtil");
 const StreamMultiplexer = require("./src/StreamMultiplexer");
 const fs = require("fs");
+const { resolve } = require("path");
 
 async function get_webpack_started(cfg) {
   try {
@@ -48,11 +49,12 @@ async function get_webpack_started(cfg) {
 }
 
 (async () => {
-  await ConfigUtil.interactive();
-
-  const cfg = require("./config");
+  const args = process.argv.slice(2);
+  const configPath = resolve(args[0] ?? "./config.js");
+  console.log(`Using config file located at ${configPath}`);
+  await ConfigUtil.interactive(configPath);
+  const cfg = require(configPath);
   await get_webpack_started(cfg);
-
   const log_sinks = cfg.log_sinks || [
     [
       "node",
@@ -65,5 +67,9 @@ async function get_webpack_started(cfg) {
     ],
     ["node", "./standalones/LogPrinter.js"],
   ];
-  StreamMultiplexer.setup_log_pipes(log_sinks, COORDINATOR_MODULE_PATH);
+  StreamMultiplexer.setup_log_pipes(
+    log_sinks,
+    COORDINATOR_MODULE_PATH,
+    configPath,
+  );
 })();

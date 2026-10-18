@@ -2,6 +2,10 @@
 //the session key can be used to take over your account
 //and I would know.(<3 u Nex)
 module.exports = {
+  //base url of the server cluster: "https://adventure.land" (official)
+  //or a server on this machine, e.g. "http://localhost:8083"; nothing else:
+  //caracAL runs the code a game server sends without a browser's sandbox
+  base_url: "https://adventure.land",
   //to obtain a session: show_json(parent.user_id+"-"+parent.user_auth)
   //or just delete the config file and restart caracAL
   session: "1111111111111111-abc123ABCabc123ABCabc",

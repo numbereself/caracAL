@@ -1,13 +1,14 @@
 const vm = require("vm");
 const io = require("socket.io-client");
+const { socket_address } = require("./server_url");
 const fs = require("fs").promises;
 const { JSDOM } = require("jsdom");
 const node_query = require("jquery");
-const game_files = require("../game_files");
+const game_files = require("./game_files");
 const fetch = (...args) =>
   import("node-fetch").then(({ default: fetch }) => fetch(...args));
-const monitoring_util = require("../monitoring_util");
-const ipc_storage = require("../ipcStorage");
+const monitoring_util = require("./monitoring_util");
+const ipc_storage = require("./ipcStorage");
 
 const LogUtils = require("./LogUtils");
 const { console } = LogUtils;
@@ -25,9 +26,8 @@ const html_spoof = `<!DOCTYPE html>
 </body>
 </html>`;
 
-function make_context(upper = null) {
-  const result = new JSDOM(html_spoof, { url: "https://adventure.land/" })
-    .window;
+function make_context(upper = null, base_url) {
+  const result = new JSDOM(html_spoof, { url: base_url }).window;
   //jsdom maked globalThis point to Node global
   //but we want it to be window instead
   result.globalThis = result;
@@ -94,13 +94,15 @@ function patch_no_graphics_skin_change(context) {
   );
 }
 
-async function make_runner(upper, CODE_file, version, is_typescript) {
+async function make_runner(upper, CODE_file, proc_args, is_typescript) {
   const runner_sources = game_files
     .get_runner_files()
-    .map((f) => game_files.locate_game_file(f, version));
+    .map((f) =>
+      game_files.locate_game_file(proc_args.base_url, f, proc_args.version),
+    );
   console.log("constructing runner instance");
   console.debug("source files:\n%s", runner_sources);
-  const runner_context = make_context(upper);
+  const runner_context = make_context(upper, proc_args.base_url);
   //contents of adventure.land/runner
   //its an html file but not labeled as such
   //TODO in the future i should consider parsing the relevant parts out of the html files directly
@@ -210,24 +212,33 @@ async function make_runner(upper, CODE_file, version, is_typescript) {
 async function make_game(proc_args) {
   //the game files read html_vars.js as they evaluate, html_init.js calls back
   //into them - hence the order
-  const game_sources = ["./html_vars.js"]
+  const game_sources = ["./src/html_vars.js"]
     .concat(
       game_files
         .get_game_files()
-        .map((f) => game_files.locate_game_file(f, proc_args.version)),
+        .map((f) =>
+          game_files.locate_game_file(proc_args.base_url, f, proc_args.version),
+        ),
     )
-    .concat(["./html_init.js"]);
+    .concat(["./src/html_init.js"]);
   console.log("constructing game instance");
   console.debug("source files:\n%s", game_sources);
-  const game_context = make_context();
+  const game_context = make_context(null, proc_args.base_url);
   game_context.io = io;
   game_context.bowser = {};
   await ev_files(game_sources, game_context);
   patch_no_graphics_skin_change(game_context);
   game_context.VERSION = "" + game_context.G.version;
-  game_context.server_address = "wss://" + proc_args.realm_address;
-  game_context.server_path = proc_args.realm_path;
-  game_context.server_port = proc_args.realm_port;
+  game_context.Local = "";
+  game_context.Dev = "";
+  game_context.Place = "code";
+  const realmHost = proc_args.realm_address ?? proc_args.realm_addr;
+  game_context.server_address = socket_address(proc_args.base_url, realmHost);
+  // an empty path still falls back: `??` alone treats "" as intentional
+  game_context.server_path = proc_args.realm_path || "/socket.io/";
+  if (proc_args.realm_port) {
+    game_context.server_port = proc_args.realm_port;
+  }
   game_context.user_id = proc_args.sess.split("-")[0];
   game_context.user_auth = proc_args.sess.split("-")[1];
   game_context.character_to_load = proc_args.cid;
@@ -275,7 +286,7 @@ async function make_game(proc_args) {
       const runner_context = await make_runner(
         game_context,
         target_script,
-        proc_args.version,
+        proc_args,
         is_typescript,
       );
       extensions.runner = runner_context;
@@ -292,7 +303,7 @@ async function make_game(proc_args) {
     if (method != "servers_and_characters") {
       return old_api(method, args, r_args);
     } else {
-      console.debug("filtered s&c call");
+      console.debug("filtered s&c call", method, args, r_args);
     }
   };
   game_context.get_code_function = function (f_name) {
@@ -352,6 +363,10 @@ async function make_game(proc_args) {
     reload_timeout * 1000 + 100,
   );
   console.log("game instance constructed");
+
+  game_context.socket.on("connect_error", (err) => {
+    console.error(`connect_error due to ${err.message}`, err);
+  });
   return game_context;
 }
 //have to use on, localstorage may send messages

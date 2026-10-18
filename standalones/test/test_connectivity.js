@@ -7,6 +7,13 @@ const io = require("socket.io-client");
     query: undefined,
   });
 
+  // this ws connection works...
+  // const socket = io("ws://" + "localhost" + ":" + 8022, {
+  //   secure: false,
+  //   transports: ["websocket"],
+  //   query: undefined,
+  // });
+
   socket.on("connect", function () {
     console.log("connected");
   });
