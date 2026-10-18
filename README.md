@@ -27,12 +27,18 @@ Updated compatibility with Adventure Land's MongoDB-backed servers, thanks to [m
 
 ### Upgrading from a git installation
 
-If you have installed caracAL from cloning this repository you can upgrade by entering the following commands into a terminal:
+Stop caracAL before upgrading. Run the following commands from your existing checkout:
 
 ```bash
 git pull
-npm install
+pnpm install
+pnpm start
 ```
+
+**Migrating from npm:** Install pnpm using the instructions for
+[Debian/Ubuntu](#installation-on-debianubuntu) or [Windows](#installation-on-windows)
+below. For a clean migration, delete only the old `node_modules` directory before
+running `pnpm install`. Keep your configuration, scripts, and stored data.
 
 ### Simpler version
 
@@ -49,29 +55,24 @@ The full changelog that used to be here has moved to [CHANGELOG.md](./CHANGELOG.
 sudo apt-get update
 sudo apt-get upgrade
 sudo apt-get install git curl
-#install node version manager(nvm)
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
-#you need to restart your terminal here
-#so the nvm command can be recognized
-#install node 14
-#latest(16) does not like socket.io for some reason.
-nvm install 14
+#install pnpm
+curl -fsSL https://get.pnpm.io | sh -
+#source bashrc
+#alternatively you can open a new terminal
+. ~/.bashrc
 #download caracAL
 git clone https://github.com/numbereself/caracAL.git
 #switch to directory
 cd caracAL
-#use npm to download dependencies
-npm install
+#download dependencies and run caracAL
+pnpm install && pnpm start
 #if you want caracAL to autostart run
-#chmod +x ./start_on_boot.sh
 #./start_on_boot.sh
-#run caracAL
-node main.js
 ```
 
-## Installation on Windows 10
+## Installation on Windows
 
-First download Node.js version 14 and npm from
+First download Node.js version 24 and npm from
 
 [https://nodejs.org/en/download/](https://nodejs.org/en/download/ "Node.js homepage")
 
@@ -80,6 +81,8 @@ Run the installer you just downloaded. MAKE SURE THAT YOU ENABLE THE "Add to PAT
 Next hit WINDOWS+R and type "powershell" in the window that opens, and hit enter. You should now be presented with the windows powershell. Copy and paste the following script
 
 ```
+#install pnpm
+npx get-pnpm
 #download caracAL
 wget https://github.com/numbereself/caracAL/archive/refs/heads/main.zip -OutFile caracAL.zip
 #unzip archive
@@ -88,10 +91,10 @@ tar -xf caracAL.zip caracAL-main
 ren "caracAL-main" "caracAL"
 #switch to directory
 cd caracAL
-#use npm to download dependencies
-npm install
+#download dependencies
+pnpm install
 #run caracAL
-node main.js
+pnpm start
 ```
 
 ## First run and configuration
