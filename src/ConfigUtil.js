@@ -3,6 +3,7 @@ var inquirer = require("inquirer");
 const fetch = (...args) =>
   import("node-fetch").then(({ default: fetch }) => fetch(...args));
 const account_info = require("../account_info");
+const { check_base_url, OFFICIAL } = require("./server_url");
 const fs = require("fs").promises;
 const { constants } = require("fs");
 
@@ -56,7 +57,7 @@ async function prompt_server() {
       message: `What servers are you playing on?`,
       choices: [
         { value: true, name: "Official (Recommended)" },
-        { value: false, name: "Custom" },
+        { value: false, name: "A server on this machine" },
       ],
     },
     {
@@ -64,24 +65,26 @@ async function prompt_server() {
       name: "server_url",
       message:
         "Type in the url of the server, for example http://localhost:8083\n" +
-        "Make sure you trust the server you are connecting to",
+        "caracAL runs the code a game server sends without a browser's sandbox,\n" +
+        "so it only connects to adventure.land or a server on this machine",
       when(answers) {
         return !answers.use_official_server;
       },
+      validate(input) {
+        try {
+          check_base_url(input);
+          return true;
+        } catch (e) {
+          return e.message;
+        }
+      },
     },
-    // TODO: can we validate for a correct url?
   ]);
 
   if (use_official_server) {
-    return "https://adventure.land";
-  } else {
-    if (server_url.startsWith("http://")) {
-      console.warn(
-        "HTTP custom server: sockets use ws:// (matched to base_url). HTTPS still preferred for public hosts.",
-      );
-    }
-    return server_url;
+    return OFFICIAL;
   }
+  return server_url;
 }
 
 async function prompt_chars(all_chars) {
@@ -275,9 +278,9 @@ function make_cfg_string(conf_object = {}) {
 //the session key can be used to take over your account
 //and I would know.(<3 u Nex)
 module.exports = {
-  //base url of the server cluster
-  //official servers are "https://adventure.land"
-  //make sure you trust the servers you are connecting to
+  //base url of the server cluster: "https://adventure.land" (official)
+  //or a server on this machine, e.g. "http://localhost:8083"; nothing else:
+  //caracAL runs the code a game server sends without a browser's sandbox
   ${ezpz("base_url", "https://adventure.land")},
   //to obtain a session: show_json(parent.user_id+"-"+parent.user_auth)
   //or just delete the config file and restart caracAL

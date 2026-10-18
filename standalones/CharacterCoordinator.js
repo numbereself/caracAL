@@ -1,6 +1,7 @@
 const child_process = require("node:child_process");
 const account_info = require("../account_info");
 const game_files = require("../src/game_files");
+const { check_base_url, is_official } = require("../src/server_url");
 const bwi = require("bot-web-interface");
 const monitoring_util = require("../src/monitoring_util");
 const express = require("express");
@@ -78,6 +79,12 @@ function migrate_old_storage(path, localStorage) {
   // const cfg = require("../config");
   const cfg = require(CARACAL_CONFIG_PATH);
   const base_url = cfg.base_url || "https://adventure.land";
+  check_base_url(base_url);
+  if (!is_official(base_url)) {
+    console.warn(
+      `${base_url}: a game server on this machine. caracAL runs the code it sends without a browser's sandbox`,
+    );
+  }
 
   const version = await game_files.ensure_latest(base_url);
   if (cfg.cull_versions) {

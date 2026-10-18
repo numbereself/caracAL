@@ -4,7 +4,7 @@
   "description": "caracAL - Node client for adventure.land",
   "main": "main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test \"src/**/*.test.js\""
   },
   "author": "number_e",
   "license": "MIT",
