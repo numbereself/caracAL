@@ -384,8 +384,14 @@ function migrate_old_storage(path, localStorage) {
   }
   //TODO beta new logic for #5
   //i need to implement decent lifecycle-handling
+
+  let shutting_down = false;
   ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) =>
     process.on(signal, async () => {
+      // Ctrl-C reaches the coordinator twice: from the terminal and through main.js
+      if (shutting_down) return;
+      shutting_down = true;
+      setTimeout(() => process.exit(1), 15_000).unref(); // never longer than 15 s
       console.log(`Received ${signal} on master. Rounding up clients`);
       //softkill all chars, giving them chance to shutdown
       await Promise.all(
@@ -404,6 +410,8 @@ function migrate_old_storage(path, localStorage) {
       process.exit();
     }),
   );
+  // main.js gone (killed, crashed): run the same shutdown rather than play on unseen
+  process.on("disconnect", () => process.emit("SIGTERM"));
 
   const tasks = Object.keys(character_manage).forEach((c_name) => {
     const char = character_manage[c_name];

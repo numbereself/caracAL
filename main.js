@@ -65,5 +65,13 @@ async function get_webpack_started(cfg) {
     ],
     ["node", "./standalones/LogPrinter.js"],
   ];
-  StreamMultiplexer.setup_log_pipes(log_sinks, COORDINATOR_MODULE_PATH);
+  const coordinator = StreamMultiplexer.setup_log_pipes(
+    log_sinks,
+    COORDINATOR_MODULE_PATH,
+  );
+  // a signal to main.js (Ctrl-C, kill, a service manager) stops the coordinator, which stops the characters
+  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+    process.on(signal, () => coordinator.kill("SIGTERM"));
+  }
+  coordinator.on("exit", (code) => process.exit(code ?? 1));
 })();

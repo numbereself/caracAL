@@ -15,6 +15,9 @@ const { console } = LogUtils;
 process.on("unhandledRejection", function (exception) {
   console.warn("promise rejected: \n", exception);
 });
+// without the coordinator (killed, crashed): character runs uncoordinated;
+// stop rather than than play on unseen
+process.on("disconnect", () => process.exit());
 
 const html_spoof = `<!DOCTYPE html>
 <html>
