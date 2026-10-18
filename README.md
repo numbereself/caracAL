@@ -4,37 +4,45 @@ A Node.js client for [adventure.land](https://adventure.land/ "Adventure Land")
 
 ## Recent Versions
 
-#### 2026-01-23
+### pnpm and Node.js 24
 
-Fixed ENOENT error for nonexistent TYPECODE.out file
+#### 2026-10-18
 
-### Typescript
+**Breaking installation change:** We are now using pnpm instead of
+npm, and Node.js 24 instead of the previously documented
+Node.js 14 setup.
 
-#### 2024-03-10
+After upgrading, use pnpm instead of npm for dependency installation and
+updates. Refer to [Upgrading from a git installation](./README.md#upgrading-from-a-git-installation).
 
-##### npm install required
+### caracAL for MongoDB Edition
 
-This update introduces the ability to run TypeScript directly in caracAL.
+#### 2026-10-17
 
-TypeScript is much similar to JavaScript but allows code to be much safer in development and enables better autocompletion in IDEs.
+Updated compatibility with Adventure Land's MongoDB-backed servers, thanks to [mrdiamond12312](https://github.com/mrdiamond12312) in [PR #21](https://github.com/numbereself/caracAL/pull/21).
 
-TypeScript is opt-in. If you would like to continue working with JavaScript you can. If you already have a working pipeline with TypeScript it will continue to work.
-
-caracAL also allows you to expose your TypeScript creations via webserver.
-You can use this capability to load fully bundled versions of your code into other places, such as the official client while developing.
+- Updated login, account information and server connections for the new APIs.
+- Added newly required game files and fixed game and script initialization compatibility.
+- Fixed runtime errors caused by changes in the game client.
 
 ### Upgrading from a git installation
 
-If you have installed caracAL from cloning this repository you can upgrade by entering the following commands into a terminal:
+**Migrating from npm:** Install pnpm using the instructions for
+[Debian/Ubuntu](#installation-on-debianubuntu) or [Windows](#installation-on-windows)
+below. For a clean migration, delete only the old `node_modules` directory before
+running `pnpm install`. Keep your configuration, scripts, and stored data.
+
+Stop caracAL before upgrading. Run the following commands from your existing checkout:
 
 ```bash
 git pull
-npm install
+pnpm install
+pnpm start
 ```
 
 ### Simpler version
 
-Simply reinstall caracAL by following the steps below. You can keep the config.js file from your old installation for ease of use.
+Simply reinstall caracAL by following the steps below. You can keep the config.js file as well as any data files from your old installation for ease of use.
 
 ### Full Changelog
 
@@ -47,29 +55,24 @@ The full changelog that used to be here has moved to [CHANGELOG.md](./CHANGELOG.
 sudo apt-get update
 sudo apt-get upgrade
 sudo apt-get install git curl
-#install node version manager(nvm)
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
-#you need to restart your terminal here
-#so the nvm command can be recognized
-#install node 14
-#latest(16) does not like socket.io for some reason.
-nvm install 14
+#install pnpm
+curl -fsSL https://get.pnpm.io | sh -
+```
+
+Restart your terminal so pnpm is available, then continue:
+
+```bash
 #download caracAL
 git clone https://github.com/numbereself/caracAL.git
 #switch to directory
 cd caracAL
-#use npm to download dependencies
-npm install
-#if you want caracAL to autostart run
-#chmod +x ./start_on_boot.sh
-#./start_on_boot.sh
-#run caracAL
-node main.js
+#download dependencies and run caracAL
+pnpm install && pnpm start
 ```
 
-## Installation on Windows 10
+## Installation on Windows
 
-First download Node.js version 14 and npm from
+First download Node.js version 24 and npm from
 
 [https://nodejs.org/en/download/](https://nodejs.org/en/download/ "Node.js homepage")
 
@@ -78,6 +81,8 @@ Run the installer you just downloaded. MAKE SURE THAT YOU ENABLE THE "Add to PAT
 Next hit WINDOWS+R and type "powershell" in the window that opens, and hit enter. You should now be presented with the windows powershell. Copy and paste the following script
 
 ```
+#install pnpm
+npx get-pnpm
 #download caracAL
 wget https://github.com/numbereself/caracAL/archive/refs/heads/main.zip -OutFile caracAL.zip
 #unzip archive
@@ -86,15 +91,15 @@ tar -xf caracAL.zip caracAL-main
 ren "caracAL-main" "caracAL"
 #switch to directory
 cd caracAL
-#use npm to download dependencies
-npm install
+#download dependencies
+pnpm install
 #run caracAL
-node main.js
+pnpm start
 ```
 
 ## First run and configuration
 
-When you first run caracAL it will ask you for your login credentials to adventure.land. After you have sucessfully entered them it will ask you which characters to start and in which realm. Finally it will ask you if you want to use the bot monitoring panel, and if you answer that with yes also if you want a minimap and what port you want it to be on. Once these questions are answered caracAL will generate a file config.js for you, containing the information you just entered. The characters you specified will immediately be loaded into caracAL and start farming crabs using the script example.js or crabs_with_tophats.js if you chose to enable TypeScript.
+When you first run caracAL it will ask you for your login credentials to adventure.land. After you have sucessfully entered them it will ask you which characters to start and in which realm. Finally it will ask you if you want to use the bot monitoring panel, and if you answer that with yes also if you want a minimap and what port you want it to be on. Once these questions are answered caracAL will generate a file config.js for you, containing the information you just entered. The characters you specified will immediately be loaded into caracAL and start farming crabs using [crabs.js](./CODE/caracAL/examples/crabs.js) or [crabs_with_tophats.ts](./TYPECODE/caracAL/examples/crabs_with_tophats.ts) if you chose to enable TypeScript.
 
 ### config.js
 
@@ -126,7 +131,7 @@ Each character has five fields:
 - version: Which version of the game client this character should run. A value of 0 represents the latest version
 
 - script: Which JavaScript script the character should run. Scripts are located in the CODE folder. Will be ignored in a TypeScript setup.
-- typescript: Which TypeScript script the character should run. Scripts are located in the TYPECODE folder. Requires enable_TYPESCRIPT to be set to true. Take note that the file ending specified still needs to be .js and not .ts .
+- typescript: Which TypeScript script the character should run. Scripts are located in the TYPECODE folder. Requires enable_TYPECODE to be set to true. Take note that the file ending specified still needs to be .js and not .ts .
 
 ### Running your own code
 
@@ -194,7 +199,7 @@ if (parent.caracAL) {
 
 code messages(cms) sent from one character to another within the same instance of caracAL are near-instant. cms sent in this manner will have the `caracAL` property set to `true`. This was a lesser known feature in ALbot, which some players used to better coordinate the farming of certain low-hp mobs or in other words ALL HAIL THE CRAB GOD!!
 
-caracAL logs to the file caracAL.log. It also rotates this log when it gets larger than 1.5mb and keeps 3 of these logs. This is helpful when trying to narrow down what your bots did while deployed with caracAL.
+caracAL writes structured, rotated logs to help diagnose your bots. See [Log Configuration](#log-configuration).
 
 The information available in `parent.X` is needed by the coordination part of caracAL. As a result this information is not obtained by each character individually, but for all characters centrally. A nice side effect of this is, that the information in `parent.X` is updated more often than it would be in a normal client.
 
@@ -223,10 +228,10 @@ This allows us to store log metadata such as log time, which character logged it
 A typical log now looks like so:
 
 ```json
-{"level":30,"time":1694346299637,"id":"SlMw","type":"unspecified","type":"console","func":"log","args":[],"msg":"updating account info"}
-{"level":30,"time":1694346299653,"id":"EwAR","type":"unspecified","cname":"CodeGorm","clid":"2","col":"gray","type":"game_logs","msg":"You killed a Tiny Crab"}
-{"level":30,"time":1694346299761,"id":"EwAR","type":"unspecified","cname":"CodeGorm","clid":"2","col":"gold","type":"game_logs","msg":"7 gold"}
-{"level":30,"time":1694346299955,"id":"SlMw","type":"unspecified","type":"console","func":"log","args":[],"msg":"found 8 servers and 8 characters"}
+{"level":30,"time":1792343283834,"id":"mcNm","type":"console","func":"log","args":[],"msg":"updating account info"}
+{"level":30,"time":1792343283980,"id":"mcNm","type":"console","func":"log","args":[],"msg":"found 13 servers and 8 characters"}
+{"level":30,"time":1792343284634,"id":"xQ4N","cname":"CodeGorm","clid":2,"col":"gray","type":"game_logs","msg":"You killed a Tiny Crab"}
+{"level":30,"time":1792343284702,"id":"xQ4N","cname":"CodeGorm","clid":2,"col":"gold","type":"game_logs","msg":"57 gold"}
 ```
 
 #### Integration into CODE
@@ -249,11 +254,11 @@ For a more complete reference you can refer to [the pino API docs](https://githu
 
 #### Supported Properties
 
-caracAL has a custom log formatter located in `./standalones/Logprinter.js`.  
+caracAL has a custom log formatter located in [standalones/LogPrinter.js](./standalones/LogPrinter.js).
 It supports the following automatic log properties:
 
 - level : which log level the message is on. more important messages are higher level
-- time : a unix timestamp (seconds sine 1970-01-01) when the message occurred.
+- time : a Unix timestamp in milliseconds since 1970-01-01 when the message occurred.
 - id : a random generated char sequence to identify different threads.
 - cname : the character name that the event happened on
 - clid : an int representing which class the character is
@@ -288,14 +293,17 @@ This config option controls where logs are written to.
 
 Each entry represents one console commmand, split into its separate arguments.
 
-The default behaviour is to log formatted output to the console with the command  
+The generated configuration logs formatted output to the console with the command
 `node ./standalones/LogPrinter.js`  
 as well as to a logrotated file in `./logs/caracAL.log.jsonl`:  
-`node ./node_modules/logrotate-stream/bin/logrotate-stream ./logs/caracAL.log.jsonl --keep 3 --size 1500000`  
+`node ./node_modules/logrotate-stream/bin/logrotate-stream ./logs/caracAL.log.jsonl --keep 3 --size 4500000`
 This is different from the old logfile located at `./caracAL.log`
 
+The generated configuration and runtime fallback use a 4.5 MB rotation threshold
+and keep three rotated files. Existing configurations retain their configured limit.
+
 If you want to supply your own log destination, assume that there is jsonl-data being streamed on stdin.  
-If you are an an advanced linuxer you can specify the array `["bash" "-c" "command_you actually want to run > you_can_use_pipes"]`  
+If you are an advanced linuxer you can specify the array `["bash", "-c", "command_you actually want to run > you_can_use_pipes"]`
 Just keep in mind that you have to use json-escaping for specifying the command itself.
 
 ## localStorage and sessionStorage
@@ -323,6 +331,8 @@ By default caracAL uses a version culling mechanism. If you want to preserve ver
 You can rename your custom version with many edits to a name that is not numeric. If you do that then caracAL will never delete it. Now you just have edit your config.js to make your bots actually use the version you renamed in this manner. The version will thus be preserved and your bots will continue running it.
 
 ## Bot Monitoring Panel
+
+> **Security:** The web server port (default: 924) provides unauthenticated, read-only access to monitoring data and enabled script shares; restrict network access accordingly.
 
 In the most recent version caracAL added the ability to check up on your bots through a web interface. It can be acessed with a browser, such as firefox or chrome. You need to enable this feature through the config.js file, the details of which are also in this document. If you run caracAL on the same machine as your browser and on the default port you can access the panel under the url `http://localhost:924/`.
 It looks somewhat like this:

@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S pnpm exec node
 
 const pump = require("pump");
 const pino_pretty = require("pino-pretty");

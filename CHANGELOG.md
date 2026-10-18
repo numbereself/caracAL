@@ -4,6 +4,27 @@ Here you can review the historic development of caracAL.
 
 I do not bundle releases but with the timestamp you can usually find the relevant git commit.
 
+### pnpm and Node.js 24
+
+#### 2026-10-18
+
+**Breaking installation change:** We are now using pnpm instead of
+npm, and Node.js 24 instead of the previously documented
+Node.js 14 setup.
+
+After upgrading, use pnpm instead of npm for dependency installation and
+updates. Refer to [Upgrading from a git installation](./README.md#upgrading-from-a-git-installation).
+
+### caracAL for MongoDB Edition
+
+#### 2026-10-17
+
+Updated compatibility with Adventure Land's MongoDB-backed servers, thanks to [mrdiamond12312](https://github.com/mrdiamond12312) in [PR #21](https://github.com/numbereself/caracAL/pull/21).
+
+- Updated login, account information and server connections for the new APIs.
+- Added newly required game files and fixed game and script initialization compatibility.
+- Fixed runtime errors caused by changes in the game client.
+
 #### 2026-01-23
 
 Fixed ENOENT error for nonexistent TYPECODE.out file
