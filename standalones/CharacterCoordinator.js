@@ -235,6 +235,7 @@ function migrate_old_storage(path, localStorage) {
     result.stdout.pipe(process.stdout);
     result.stderr.pipe(process.stderr);
     char_block.instance = result;
+    let reached_game = false;
     result.on("exit", () => {
       if (char_block.monitor) {
         //close monitor
@@ -244,7 +245,24 @@ function migrate_old_storage(path, localStorage) {
       char_block.connected = false;
       char_block.instance = null;
       if (char_block.enabled) {
-        start_char(char_name);
+        // a character that exits before reaching the game (a bad flag, a failed login) would restart in a tight loop,
+        // so it backs off: 1 s, then 2, 4... up to a minute. once in the game (a deploy, a crash later on) it restarts at once
+        char_block.restart_backoff = reached_game
+          ? 0
+          : Math.min((char_block.restart_backoff || 500) * 2, 60_000);
+        if (char_block.restart_backoff) {
+          console.log(
+            `${char_name} exited before reaching the game, restarting in ${
+              char_block.restart_backoff / 1000
+            } s`,
+          );
+        }
+        setTimeout(() => {
+          // not if it was stopped or deployed meanwhile
+          if (char_block.enabled && !char_block.instance) {
+            start_char(char_name);
+          }
+        }, char_block.restart_backoff);
       }
     });
     result.on("message", (m) => {
@@ -258,6 +276,7 @@ function migrate_old_storage(path, localStorage) {
         case "initialized":
           break;
         case "connected":
+          reached_game = true;
           char_block.connected = true;
           update_siblings_and_acc(my_acc.response);
           break;
