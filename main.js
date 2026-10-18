@@ -44,6 +44,7 @@ async function get_webpack_started(cfg) {
       "--no-color",
       "--watch",
     );
+    return wp_seed;
   }
 }
 
@@ -51,7 +52,7 @@ async function get_webpack_started(cfg) {
   await ConfigUtil.interactive();
 
   const cfg = require("./config");
-  await get_webpack_started(cfg);
+  const webpack = await get_webpack_started(cfg);
 
   const log_sinks = cfg.log_sinks || [
     [
@@ -70,8 +71,16 @@ async function get_webpack_started(cfg) {
     COORDINATOR_MODULE_PATH,
   );
   // a signal to main.js (Ctrl-C, kill, a service manager) stops the coordinator, which stops the characters
+  // a second signal kills it outright; the characters follow, as they stop when their coordinator is gone
+  let stopping = false;
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
-    process.on(signal, () => coordinator.kill("SIGTERM"));
+    process.on(signal, () => {
+      coordinator.kill(stopping ? "SIGKILL" : "SIGTERM");
+      stopping = true;
+    });
   }
-  coordinator.on("exit", (code) => process.exit(code ?? 1));
+  coordinator.on("exit", (code) => {
+    webpack?.kill();
+    process.exit(code ?? 1);
+  });
 })();
