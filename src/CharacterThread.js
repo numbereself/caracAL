@@ -1,7 +1,7 @@
 const vm = require("vm");
 const io = require("socket.io-client");
 const fs = require("fs").promises;
-const { JSDOM } = require("jsdom");
+const { JSDOM, CookieJar } = require("jsdom");
 const node_query = require("jquery");
 const game_files = require("../game_files");
 const fetch = (...args) =>
@@ -25,9 +25,18 @@ const html_spoof = `<!DOCTYPE html>
 </body>
 </html>`;
 
+//each character's cookie jar, shared by its game page and its CODE's runner page as a browser's tabs share one.
+//with the session's cookie in it, the game's own requests to its site (its api_call's $.ajax, require_code
+//loading a slot) are logged in, as they are in a browser
+const cookie_jars = new WeakMap();
+
 function make_context(upper = null) {
-  const result = new JSDOM(html_spoof, { url: "https://adventure.land/" })
-    .window;
+  const cookieJar = (upper && cookie_jars.get(upper)) || new CookieJar();
+  const result = new JSDOM(html_spoof, {
+    url: "https://adventure.land/",
+    cookieJar,
+  }).window;
+  cookie_jars.set(result, cookieJar);
   //jsdom maked globalThis point to Node global
   //but we want it to be window instead
   result.globalThis = result;
@@ -230,6 +239,12 @@ async function make_game(proc_args) {
   game_context.server_port = proc_args.realm_port;
   game_context.user_id = proc_args.sess.split("-")[0];
   game_context.user_auth = proc_args.sess.split("-")[1];
+  cookie_jars
+    .get(game_context)
+    .setCookieSync(
+      `auth=${proc_args.sess}; Path=/`,
+      game_context.location.href,
+    );
   game_context.character_to_load = proc_args.cid;
 
   //expose the block under parent.caracAL
