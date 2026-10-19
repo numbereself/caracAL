@@ -165,27 +165,6 @@ async function make_runner(upper, CODE_file, version, is_typescript) {
     `,
     vm_contexts.get(runner_context),
   );
-
-  // Avoid defining duplicate String methods in the same VM
-  vm.runInContext(
-    `
-  (function() {
-    const originalDefine = Object.defineProperty;
-
-    Object.defineProperty = function(obj, prop, descriptor) {
-      if (
-        obj === String.prototype &&
-        prop === "hashCode" &&
-        Object.prototype.hasOwnProperty.call(String.prototype, "hashCode")
-      ) {
-        return obj; // ignore duplicate
-      }
-      return originalDefine(obj, prop, descriptor);
-    };
-  })();
-`,
-    vm_contexts.get(runner_context),
-  );
   await ev_files(runner_sources, runner_context);
   runner_context.send_cm = function (to, data) {
     process.send({
