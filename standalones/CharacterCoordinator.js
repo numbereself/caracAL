@@ -14,6 +14,20 @@ const { log, console, ctype_to_clid } = require("../src/LogUtils");
 
 const FileStoredKeyValues = require("../src/FileStoredKeyValues");
 
+const INITIAL_RESTART_DELAY_MS = 1_000;
+const MAX_RESTART_DELAY_MS = 60_000;
+
+function reset_backoff(char_block) {
+  char_block.restart_backoff = 0;
+}
+
+function apply_next_backoff(char_block) {
+  char_block.restart_backoff =
+    char_block.restart_backoff === 0
+      ? INITIAL_RESTART_DELAY_MS
+      : Math.min(char_block.restart_backoff * 2, MAX_RESTART_DELAY_MS);
+}
+
 //TODO check for invalid session
 //TODO improve termination
 //MAYBE improve linux service
@@ -228,6 +242,7 @@ function migrate_old_storage(path, localStorage) {
       args.typescript_file = char_block.typescript;
     }
 
+    apply_next_backoff(char_block);
     const result = child_process.fork("./src/CharacterThread.js", [], {
       stdio: ["ignore", "pipe", "pipe", "ipc"],
     });
@@ -244,7 +259,18 @@ function migrate_old_storage(path, localStorage) {
       char_block.connected = false;
       char_block.instance = null;
       if (char_block.enabled) {
-        start_char(char_name);
+        if (char_block.restart_backoff > 0) {
+          console.log(
+            `${char_name} exited before reaching the game, restarting in ${char_block.restart_backoff / 1000
+            } s`,
+          );
+        }
+        setTimeout(() => {
+          // not if it was stopped or deployed meanwhile
+          if (char_block.enabled && !char_block.instance) {
+            start_char(char_name);
+          }
+        }, char_block.restart_backoff);
       }
     });
     result.on("message", (m) => {
@@ -258,6 +284,7 @@ function migrate_old_storage(path, localStorage) {
         case "initialized":
           break;
         case "connected":
+          reset_backoff(char_block);
           char_block.connected = true;
           update_siblings_and_acc(my_acc.response);
           break;
@@ -266,6 +293,9 @@ function migrate_old_storage(path, localStorage) {
           //or not find any, make a new one and start it
           const new_char_name = m.character || char_name;
           const candidate = character_manage[new_char_name] || {};
+          if (!character_manage[new_char_name]) {
+            reset_backoff(candidate);
+          }
           character_manage[new_char_name] = candidate;
           candidate.enabled = true;
           candidate.realm = m.realm || char_block.realm;
@@ -401,6 +431,7 @@ function migrate_old_storage(path, localStorage) {
 
   const tasks = Object.keys(character_manage).forEach((c_name) => {
     const char = character_manage[c_name];
+    reset_backoff(char);
     char.connected = false;
     if (char.enabled) {
       start_char(c_name);
