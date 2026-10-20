@@ -261,7 +261,8 @@ function migrate_old_storage(path, localStorage) {
       if (char_block.enabled) {
         if (char_block.restart_backoff > 0) {
           console.log(
-            `${char_name} exited before reaching the game, restarting in ${char_block.restart_backoff / 1000
+            `${char_name} exited before reaching the game, restarting in ${
+              char_block.restart_backoff / 1000
             } s`,
           );
         }
