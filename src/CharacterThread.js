@@ -1,8 +1,8 @@
 const vm = require("vm");
-const io = require("socket.io-client");
+const path = require("path");
 const fs = require("fs").promises;
+const { readFileSync } = require("fs");
 const { JSDOM } = require("jsdom");
-const node_query = require("jquery");
 const game_files = require("../game_files");
 const fetch = (...args) =>
   import("node-fetch").then(({ default: fetch }) => fetch(...args));
@@ -25,14 +25,67 @@ const html_spoof = `<!DOCTYPE html>
 </body>
 </html>`;
 
+//the browser builds of jQuery and socket.io-client, run inside the page: their ajax results and socket packets are
+//the page's own objects
+const jquery_source = readFileSync(require.resolve("jquery"), "utf8");
+const socket_io_source = readFileSync(
+  path.join(
+    path.dirname(require.resolve("socket.io-client/package.json")),
+    "dist/socket.io.min.js",
+  ),
+  "utf8",
+);
+
+//the builtin constructors a page has of its own (V8's: Object, Array, Error...; not Node's additions)
+const BUILTIN_CONSTRUCTORS = Object.getOwnPropertyNames(
+  vm.runInNewContext("globalThis"),
+).filter(
+  (name) =>
+    /^[A-Z]/.test(name) &&
+    typeof globalThis[name] === "function" &&
+    globalThis[name].prototype,
+);
+
+//a page's instanceof checks (and so the game's clone()) also accept objects made by Node (CODE's require, fetch,
+//Node's errors) and, for the runner, by the game page. a subclass keeps the usual check
+function accept_foreign_instances(page, others) {
+  vm.runInContext(
+    `(function (names, others) {
+    const has = Function.prototype[Symbol.hasInstance];
+    for (const name of names) {
+      const own = globalThis[name];
+      if (typeof own !== "function") continue;
+      const foreign = others
+        .map((other) => other[name])
+        .filter((c) => typeof c === "function" && c !== own);
+      Object.defineProperty(own, Symbol.hasInstance, {
+        configurable: true,
+        value: function (v) {
+          if (has.call(this, v)) return true;
+          return this === own && foreign.some((c) => has.call(c, v));
+        },
+      });
+    }
+  })`,
+    vm_contexts.get(page),
+  )(BUILTIN_CONSTRUCTORS, others);
+}
+
+//each page's contextified global, for vm.runInContext
+const vm_contexts = new WeakMap();
+
+//each page is a realm of its own, as in a browser: its builtins (Object, Array, eval, Function...) are its own.
+//the runner page is another realm, as the code iframe is in a browser
 function make_context(upper = null) {
-  const result = new JSDOM(html_spoof, { url: "https://adventure.land/" })
-    .window;
-  //jsdom maked globalThis point to Node global
-  //but we want it to be window instead
-  result.globalThis = result;
+  const dom = new JSDOM(html_spoof, {
+    url: "https://adventure.land/",
+    runScripts: "outside-only",
+  });
+  const result = dom.window;
+  vm_contexts.set(result, dom.getInternalVMContext());
+  accept_foreign_instances(result, upper ? [globalThis, upper] : [globalThis]);
+  vm.runInContext(jquery_source, vm_contexts.get(result));
   result.fetch = fetch;
-  result.$ = result.jQuery = node_query(result);
   result.require = require;
   result.console = console;
   if (upper) {
@@ -43,11 +96,6 @@ function make_context(upper = null) {
     result._localStorage = ipc_storage.make_IPC_storage("ls");
     result._sessionStorage = ipc_storage.make_IPC_storage("ss");
   }
-  vm.createContext(result);
-
-  result.eval = function (arg) {
-    return vm.runInContext(arg, result);
-  };
 
   return result;
 }
@@ -55,7 +103,10 @@ function make_context(upper = null) {
 async function ev_files(locations, context) {
   for (let location of locations) {
     let text = await fs.readFile(location, "utf8");
-    vm.runInContext(text + "\n//# sourceURL=file://" + location, context);
+    vm.runInContext(
+      text + "\n//# sourceURL=file://" + location,
+      vm_contexts.get(context),
+    );
   }
 }
 
@@ -90,7 +141,7 @@ function patch_no_graphics_skin_change(context) {
       };
     })();
     `,
-    context,
+    vm_contexts.get(context),
   );
 }
 
@@ -112,28 +163,7 @@ async function make_runner(upper, CODE_file, version, is_typescript) {
     var transporting=false;var Dev=''; 
     var Local='';
     `,
-    runner_context,
-  );
-
-  // Avoid defining duplicate String methods in the same VM
-  vm.runInContext(
-    `
-  (function() {
-    const originalDefine = Object.defineProperty;
-
-    Object.defineProperty = function(obj, prop, descriptor) {
-      if (
-        obj === String.prototype &&
-        prop === "hashCode" &&
-        Object.prototype.hasOwnProperty.call(String.prototype, "hashCode")
-      ) {
-        return obj; // ignore duplicate
-      }
-      return originalDefine(obj, prop, descriptor);
-    };
-  })();
-`,
-    runner_context,
+    vm_contexts.get(runner_context),
   );
   await ev_files(runner_sources, runner_context);
   runner_context.send_cm = function (to, data) {
@@ -158,14 +188,14 @@ async function make_runner(upper, CODE_file, version, is_typescript) {
   };
   vm.runInContext(
     "active = true;parent.code_active = true;set_message('Code Active');if (character.rip) character.trigger('death', {past: true});",
-    runner_context,
+    vm_contexts.get(runner_context),
   );
 
   process.on("message", (m) => {
     switch (m.type) {
       case "closing_client":
         console.log("terminating self");
-        vm.runInContext("on_destroy()", runner_context);
+        vm.runInContext("on_destroy()", vm_contexts.get(runner_context));
         process.exit();
     }
   });
@@ -220,7 +250,7 @@ async function make_game(proc_args) {
   console.log("constructing game instance");
   console.debug("source files:\n%s", game_sources);
   const game_context = make_context();
-  game_context.io = io;
+  vm.runInContext(socket_io_source, vm_contexts.get(game_context));
   game_context.bowser = {};
   await ev_files(game_sources, game_context);
   patch_no_graphics_skin_change(game_context);
@@ -264,7 +294,7 @@ async function make_game(proc_args) {
     clearTimeout(reload_task);
     //people reported bad performance when switching maps
     //and this allegedly fixes it.
-    vm.runInContext("pause()", game_context);
+    vm.runInContext("pause()", vm_contexts.get(game_context));
 
     const is_typescript =
       proc_args.typescript_file && proc_args.typescript_file.length > 0;
@@ -313,13 +343,13 @@ async function make_game(proc_args) {
     }
   })();
   `,
-    game_context,
+    vm_contexts.get(game_context),
   );
   //show_json causes a popup so it must be important
   //therefore we use warn level here
   vm.runInContext(
     'show_json = function(json) {caracAL.log.warn({data:json, type:"AL", func:"show_json"});}',
-    game_context,
+    vm_contexts.get(game_context),
   );
   process.send({ type: "initialized" });
   process.on("message", (m) => {
@@ -340,7 +370,7 @@ async function make_game(proc_args) {
         break;
     }
   });
-  vm.runInContext("the_game()", game_context);
+  vm.runInContext("the_game()", vm_contexts.get(game_context));
   const reload_timeout = 14;
   const reload_task = setTimeout(
     function () {
