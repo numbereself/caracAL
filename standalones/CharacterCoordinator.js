@@ -22,10 +22,17 @@ function reset_backoff(char_block) {
 }
 
 function apply_next_backoff(char_block) {
-  char_block.restart_backoff =
-    char_block.restart_backoff === 0
-      ? INITIAL_RESTART_DELAY_MS
-      : Math.min(char_block.restart_backoff * 2, MAX_RESTART_DELAY_MS);
+  const current_delay = char_block.restart_backoff;
+
+  if (current_delay === 0) {
+    char_block.restart_backoff = INITIAL_RESTART_DELAY_MS;
+    return;
+  }
+
+  const doubled_delay = current_delay * 2;
+  const capped_delay = Math.min(doubled_delay, MAX_RESTART_DELAY_MS);
+
+  char_block.restart_backoff = capped_delay;
 }
 
 //TODO check for invalid session
