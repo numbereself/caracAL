@@ -53,10 +53,10 @@ class FileStoredKeyValues {
     this.#handle = fs.openSync(this.#main_path, "a+");
     const handle_contents = fs.readFileSync(this.#handle, "utf8").split("\n");
     for (let line of handle_contents) {
-      const trimmed = line.trim();
-      if (trimmed.length === 0) continue;
+      const trimmed_line = line.trim();
+      if (trimmed_line.length === 0) continue;
       try {
-        const [key, value] = entries(JSON.parse(trimmed))[0];
+        const [key, value] = entries(JSON.parse(trimmed_line))[0];
         if (value === null) {
           this.#backend.delete(key);
         } else {
@@ -66,7 +66,7 @@ class FileStoredKeyValues {
         console.error(
           `FileStoredKeyValues: skipping corrupt line (${
             err.message
-          }): ${trimmed.slice(0, 120)}`,
+          }): ${trimmed_line.slice(0, 120)}`,
         );
       }
     }
