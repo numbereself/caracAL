@@ -6,12 +6,12 @@ class FileStoredKeyValues {
   #replacer_path;
   #backend;
   #handle;
-  #refactorTask;
+  #compactionTimer;
 
   constructor(
     main_path = "garage.jsonl",
     replacer_path = "garage.new.jsonl",
-    refactor_interval = 30e3,
+    compaction_interval = 30e3,
   ) {
     if (main_path === replacer_path) {
       throw new Error(
@@ -22,8 +22,8 @@ class FileStoredKeyValues {
     this.#replacer_path = replacer_path;
     this.#backend = new Map();
     this.#initializeHandle();
-    this.#refactorTask = setInterval(() => this.refactor(), refactor_interval);
-    this.refactor();
+    this.#compactionTimer = setInterval(() => this.compact(), compaction_interval);
+    this.compact();
   }
 
   #checkFileExistence(path) {
@@ -67,32 +67,41 @@ class FileStoredKeyValues {
     }
   }
 
-  refactor() {
-    //this method writes the current contents without history
-    //it writes to a temp file then replaces original
-    //this guarantees that data will never be lost
+  compact() {
+    // Write and sync a replacement before renaming it over the original.
+    // Keep the original handle usable if preparing or renaming fails.
     const k_v_list = [];
     for (let [key, value] of this.#backend.entries()) {
       k_v_list.push(JSON.stringify({ [key]: value }) + "\n");
     }
-    const fd = fs.openSync(this.#replacer_path, "w");
-    fs.writeFileSync(fd, k_v_list.join(""), { encoding: "utf8" });
-    fs.fsyncSync(fd);
-    fs.closeSync(fd);
-    fs.closeSync(this.#handle);
-    fs.unlinkSync(this.#main_path);
-    fs.renameSync(this.#replacer_path, this.#main_path);
-    this.#handle = fs.openSync(this.#main_path, "a");
+    const fd = fs.openSync(
+      this.#replacer_path,
+      fs.constants.O_WRONLY |
+        fs.constants.O_CREAT |
+        fs.constants.O_TRUNC |
+        fs.constants.O_APPEND,
+    );
+    try {
+      fs.writeFileSync(fd, k_v_list.join(""), { encoding: "utf8" });
+      fs.fsyncSync(fd);
+      fs.renameSync(this.#replacer_path, this.#main_path);
+    } catch (err) {
+      fs.closeSync(fd);
+      throw err;
+    }
+    const old_handle = this.#handle;
+    this.#handle = fd;
+    fs.closeSync(old_handle);
   }
 
   close() {
-    clearInterval(this.#refactorTask);
+    clearInterval(this.#compactionTimer);
     fs.closeSync(this.#handle);
   }
 
   shutdown() {
-    clearInterval(this.#refactorTask);
-    this.refactor();
+    clearInterval(this.#compactionTimer);
+    this.compact();
   }
 
   //i dont guarantee functionality if you set values that are not strings
