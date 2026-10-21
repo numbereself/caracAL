@@ -21,7 +21,8 @@ class FileStoredKeyValues {
     this.#main_path = main_path;
     this.#replacer_path = replacer_path;
     this.#backend = new Map();
-    this.#initializeHandle();
+    this.#handle = this.#openHandle();
+    this.#loadEntries();
     this.#compactionTimer = setInterval(
       () => this.compact(),
       compaction_interval,
@@ -29,9 +30,9 @@ class FileStoredKeyValues {
     this.compact();
   }
 
-  #initializeHandle() {
+  #openHandle() {
     try {
-      this.#handle = fs.openSync(
+      return fs.openSync(
         this.#main_path,
         fs.constants.O_RDWR | fs.constants.O_APPEND,
       );
@@ -39,14 +40,17 @@ class FileStoredKeyValues {
       if (err.code !== "ENOENT") throw err;
       try {
         fs.renameSync(this.#replacer_path, this.#main_path);
-      } catch (renameError) {
-        if (renameError.code !== "ENOENT") throw renameError;
+      } catch (possibleRenameError) {
+        if (possibleRenameError.code !== "ENOENT") throw possibleRenameError;
       }
-      this.#handle = fs.openSync(
+      return fs.openSync(
         this.#main_path,
         fs.constants.O_RDWR | fs.constants.O_CREAT | fs.constants.O_APPEND,
       );
     }
+  }
+
+  #loadEntries() {
     const handle_contents = fs.readFileSync(this.#handle, "utf8").split("\n");
     for (let line of handle_contents) {
       const trimmed_line = line.trim();
