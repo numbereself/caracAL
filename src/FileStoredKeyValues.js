@@ -22,7 +22,10 @@ class FileStoredKeyValues {
     this.#replacer_path = replacer_path;
     this.#backend = new Map();
     this.#initializeHandle();
-    this.#compactionTimer = setInterval(() => this.compact(), compaction_interval);
+    this.#compactionTimer = setInterval(
+      () => this.compact(),
+      compaction_interval,
+    );
     this.compact();
   }
 
@@ -61,7 +64,9 @@ class FileStoredKeyValues {
         }
       } catch (err) {
         console.error(
-          `FileStoredKeyValues: skipping corrupt line (${err.message}): ${trimmed.slice(0, 120)}`,
+          `FileStoredKeyValues: skipping corrupt line (${
+            err.message
+          }): ${trimmed.slice(0, 120)}`,
         );
       }
     }
@@ -96,12 +101,8 @@ class FileStoredKeyValues {
 
   close() {
     clearInterval(this.#compactionTimer);
+    fs.fsyncSync(this.#handle);
     fs.closeSync(this.#handle);
-  }
-
-  shutdown() {
-    clearInterval(this.#compactionTimer);
-    this.compact();
   }
 
   //i dont guarantee functionality if you set values that are not strings

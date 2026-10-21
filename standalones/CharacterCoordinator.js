@@ -402,9 +402,9 @@ function migrate_old_storage(path, localStorage) {
       );
       console.log("flushing localStorage to disk");
       try {
-        localStorage.shutdown();
+        localStorage.close();
       } catch (err) {
-        console.error("localStorage shutdown error:", err);
+        console.error("localStorage close error:", err);
       }
       console.log("now truly exiting");
       process.exit();
