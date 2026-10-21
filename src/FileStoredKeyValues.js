@@ -29,28 +29,24 @@ class FileStoredKeyValues {
     this.compact();
   }
 
-  #checkFileExistence(path) {
-    let handle = null;
-    try {
-      handle = fs.openSync(path, "r");
-    } catch (err) {
-      return false;
-    } finally {
-      if (handle !== null) {
-        fs.closeSync(handle);
-      }
-    }
-    return true;
-  }
-
   #initializeHandle() {
-    if (
-      this.#checkFileExistence(this.#replacer_path) &&
-      !this.#checkFileExistence(this.#main_path)
-    ) {
-      fs.renameSync(this.#replacer_path, this.#main_path);
+    try {
+      this.#handle = fs.openSync(
+        this.#main_path,
+        fs.constants.O_RDWR | fs.constants.O_APPEND,
+      );
+    } catch (err) {
+      if (err.code !== "ENOENT") throw err;
+      try {
+        fs.renameSync(this.#replacer_path, this.#main_path);
+      } catch (renameError) {
+        if (renameError.code !== "ENOENT") throw renameError;
+      }
+      this.#handle = fs.openSync(
+        this.#main_path,
+        fs.constants.O_RDWR | fs.constants.O_CREAT | fs.constants.O_APPEND,
+      );
     }
-    this.#handle = fs.openSync(this.#main_path, "a+");
     const handle_contents = fs.readFileSync(this.#handle, "utf8").split("\n");
     for (let line of handle_contents) {
       const trimmed_line = line.trim();
