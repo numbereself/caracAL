@@ -229,11 +229,9 @@ function migrate_old_storage(path, localStorage) {
     }
 
     const result = child_process.fork("./src/CharacterThread.js", [], {
-      stdio: ["ignore", "pipe", "pipe", "ipc"],
+      stdio: ["ignore", "inherit", "inherit", "ipc"],
     });
 
-    result.stdout.pipe(process.stdout);
-    result.stderr.pipe(process.stderr);
     char_block.instance = result;
     result.on("exit", () => {
       if (char_block.monitor) {
