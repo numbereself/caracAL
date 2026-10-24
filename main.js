@@ -1,9 +1,24 @@
-const { COORDINATOR_MODULE_PATH } = require("./src/CONSTANTS");
+const { COORDINATOR_MODULE_PATH, FANOUT_STDOUT } = require("./src/CONSTANTS");
 const ConfigUtil = require("./src/ConfigUtil");
-const StreamMultiplexer = require("./src/StreamMultiplexer");
 const fs = require("fs");
+const { spawn } = require("node:child_process");
 
-async function get_webpack_started(cfg) {
+function spawnLogFanout(destinations) {
+  const destinationArgs = destinations.map((command) =>
+    JSON.stringify(command),
+  );
+  return spawn("node", ["./src/StreamFanout.js", ...destinationArgs], {
+    stdio: ["pipe", "inherit", "inherit"],
+  });
+}
+
+function spawnWithOutput(command, args, output) {
+  return spawn(command, args, {
+    stdio: ["inherit", output, output],
+  });
+}
+
+async function startWebpack(cfg) {
   try {
     fs.rmSync("./TYPECODE.out", { recursive: true });
   } catch (error) {
@@ -22,38 +37,32 @@ async function get_webpack_started(cfg) {
         "--size",
         "1500000",
       ],
-      null,
+      FANOUT_STDOUT,
     ];
     //Run webpack once so we are guaranteed to have the compiled files
-    let wp_seed;
     console.log("Starting Initial WebPack");
-    //initially we do not use log_pipes because when the process terminates it will close our stdin/out
-    wp_seed = StreamMultiplexer.spawn_sink(
+    const initialBuild = spawn(
       "node",
-      "./node_modules/webpack/bin/webpack",
-      "--no-color",
+      ["./node_modules/webpack/bin/webpack", "--no-color"],
+      { stdio: "inherit" },
     );
 
     await new Promise((resolve) => {
-      wp_seed.on("close", resolve);
+      initialBuild.on("close", resolve);
     });
     console.log("Initial WebPack is done");
-    wp_seed = StreamMultiplexer.setup_log_pipes(
-      webpack_log_output,
-      "./node_modules/webpack/bin/webpack",
-      "--no-color",
-      "--watch",
+    const webpackFanout = spawnLogFanout(webpack_log_output);
+    const watcher = spawnWithOutput(
+      "node",
+      ["./node_modules/webpack/bin/webpack", "--no-color", "--watch"],
+      webpackFanout.stdin,
     );
-    return wp_seed;
+    webpackFanout.stdin.destroy();
+    return watcher;
   }
 }
 
-(async () => {
-  await ConfigUtil.interactive();
-
-  const cfg = require("./config");
-  const webpack = await get_webpack_started(cfg);
-
+function startCoordinator(cfg) {
   const log_sinks = cfg.log_sinks || [
     [
       "node",
@@ -66,19 +75,27 @@ async function get_webpack_started(cfg) {
     ],
     ["node", "./standalones/LogPrinter.js"],
   ];
-  const coordinator = StreamMultiplexer.setup_log_pipes(
-    log_sinks,
-    COORDINATOR_MODULE_PATH,
+  const logFanout = spawnLogFanout(log_sinks);
+  const coordinator = spawnWithOutput(
+    "node",
+    [COORDINATOR_MODULE_PATH],
+    logFanout.stdin,
   );
-  // a signal to main.js (Ctrl-C, kill, a service manager) stops the coordinator, which stops the characters
-  // a second signal kills it outright; the characters follow, as they stop when their coordinator is gone
-  let stopping = false;
-  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
-    process.on(signal, () => {
-      coordinator.kill(stopping ? "SIGKILL" : "SIGTERM");
-      stopping = true;
-    });
-  }
+  // Release only our copy; the coordinator owns its inherited endpoints.
+  logFanout.stdin.destroy();
+  return coordinator;
+}
+
+(async () => {
+  await ConfigUtil.interactive();
+
+  const cfg = require("./config");
+  const webpack = await startWebpack(cfg);
+  const coordinator = startCoordinator(cfg);
+
+  //TODO coordinate graceful termination on SIGINT etc
+  //a cross-platform solution to this will require an ipc to coordinator for sending termination
+  //TODO use automatic exit with code instead of manual hard exit
   coordinator.on("exit", (code) => {
     webpack?.kill();
     process.exit(code ?? 1);
