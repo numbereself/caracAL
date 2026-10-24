@@ -408,12 +408,7 @@ function migrate_old_storage(path, localStorage) {
       process.exit();
     }),
   );
-  // main.js gone (killed, crashed): run the same shutdown rather than play on unseen
-  process.on("disconnect", () => {
-    console.log("main.js is gone");
-    process.emit("SIGTERM");
-  });
-
+  //TODO enable sooft shutdown from coordinator
   const tasks = Object.keys(character_manage).forEach((c_name) => {
     const char = character_manage[c_name];
     char.connected = false;
