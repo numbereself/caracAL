@@ -1,4 +1,5 @@
 module.exports = {
+  FANOUT_STDOUT: "stdout",
   COORDINATOR_MODULE_PATH: "./standalones/CharacterCoordinator.js",
   CONFIG_EXAMPLE_PATH: "./config.EXAMPLE.js",
   LOCALSTORAGE_PATH: "./localStorage/caraGarage.jsonl",
