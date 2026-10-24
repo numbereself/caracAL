@@ -1,4 +1,5 @@
 const { spawn } = require("node:child_process");
+const { FANOUT_STDOUT } = require("./CONSTANTS");
 
 function isCommandArray(command) {
   return (
@@ -9,28 +10,38 @@ function isCommandArray(command) {
   );
 }
 
+function isDestination(value) {
+    const isSpecialDestination = value === FANOUT_STDOUT
+    return  isSpecialDestination || isCommandArray(value);
+}
+
 function parseDestinations(argv) {
   return argv.map((argument) => {
-    const command = JSON.parse(argument);
-    if (!isCommandArray(command)) {
+    const destinationCandidate = JSON.parse(argument);
+    if (!isDestination(destinationCandidate)) {
       throw new Error(
-        "Each destination must be a JSON array containing a command and string arguments",
+        `Each destination must be "${FANOUT_STDOUT}" or a JSON array containing a command and string arguments`,
       );
     }
-    return command;
+    return destinationCandidate;
   });
+}
+
+function openDestination(destination) {
+  if (destination === FANOUT_STDOUT) return process.stdout;
+
+  const [command, ...args] = destination;
+  return spawn(command, args, {
+    stdio: ["pipe", "inherit", "inherit"],
+  }).stdin;
 }
 
 async function fanout(destinations, source = process.stdin) {
   return new Promise((resolve, reject) => {
-    const processes = destinations.map(([command, ...args]) =>
-      spawn(command, args, {
-        stdio: ["pipe", "inherit", "inherit"],
-      }),
-    );
+    const outputs = destinations.map(openDestination);
 
-    for (const destination of processes) {
-      source.pipe(destination.stdin);
+    for (const output of outputs) {
+      source.pipe(output);
     }
     //TODO all lifecycle handling, including promise termination
   });
