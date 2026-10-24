@@ -35,7 +35,7 @@ async function startWebpack(cfg) {
         "--keep",
         "3",
         "--size",
-        "1500000",
+        "4500000",
       ],
       FANOUT_STDOUT,
     ];

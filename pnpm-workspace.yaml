@@ -1,0 +1,16 @@
+# Supply-chain hardening for caracAL's dependencies.
+# See https://pnpm.io/supply-chain-security
+
+# This repository is a single package; pnpm always includes the root package.
+packages: []
+
+# Refuse to install a version published less than a week ago, so a malicious
+# release has time to be caught and pulled before it can reach this project.
+minimumReleaseAge: 10080
+
+# Never run preinstall/install/postinstall scripts from any dependency.
+ignoreScripts: true
+
+# Only root package.json dependencies may resolve from git/tarball URLs;
+# transitive dependencies must come from the registry.
+blockExoticSubdeps: true

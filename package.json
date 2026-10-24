@@ -1,9 +1,11 @@
 {
   "name": "caracal",
   "version": "0.3.0",
+  "packageManager": "pnpm@12.14.0",
   "description": "caracAL - Node client for adventure.land",
   "main": "main.js",
   "scripts": {
+    "start": "node main.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "number_e",
@@ -11,6 +13,8 @@
   "dependencies": {
     "bot-web-interface": "^2.0.14",
     "cloneable-readable": "^3.0.0",
+    "colorette": "^2.0.20",
+    "express": "^4.22.3",
     "inquirer": "^8.2.6",
     "jquery": "^3.7.1",
     "jsdom": "^24.0.0",
@@ -20,6 +24,7 @@
     "pino-pretty": "^10.2.3",
     "pngjs": "^6.0.0",
     "pretty-ms": "^7.0.1",
+    "pump": "^3.0.4",
     "socket.io-client": "^4.7.2",
     "ts-loader": "^9.5.0",
     "typed-adventureland": "^0.0.43",
@@ -30,5 +35,12 @@
   },
   "devDependencies": {
     "prettier": "3.0.3"
+  },
+  "engines": {
+    "runtime": {
+      "name": "node",
+      "version": "24.22.0",
+      "onFail": "download"
+    }
   }
 }
