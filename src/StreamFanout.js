@@ -10,9 +10,54 @@ function isCommandArray(command) {
   );
 }
 
+function isSpecialDestination(value) {
+  return value === FANOUT_STDOUT;
+}
+
 function isDestination(value) {
-    const isSpecialDestination = value === FANOUT_STDOUT
-    return  isSpecialDestination || isCommandArray(value);
+  return isSpecialDestination(value) || isCommandArray(value);
+}
+
+function getSpecialOutputs(destinations) {
+  return destinations.filter(isSpecialDestination).map(() => process.stdout);
+}
+
+function spawnDestinationProcess(destination) {
+  return new Promise((resolve, reject) => {
+    const [command, ...args] = destination;
+    const spawnedProcess = spawn(command, args, {
+      stdio: ["pipe", "inherit", "inherit"],
+    });
+    const onStartupError = (err) => reject(err);
+    spawnedProcess.once("error", onStartupError);
+    spawnedProcess.once("spawn", () => {
+      spawnedProcess.off("error", onStartupError);
+      resolve(spawnedProcess);
+    });
+  });
+}
+
+async function openProcessOutputs(destinations) {
+  const startProcessTasks = destinations
+    .filter(isCommandArray)
+    .map(spawnDestinationProcess);
+  const startupResults = await Promise.allSettled(startProcessTasks);
+  const startedProcesses = startupResults
+    .filter((result) => result.status === "fulfilled")
+    .map((result) => result.value);
+  const startupErrors = startupResults
+    .filter((result) => result.status === "rejected")
+    .map((result) => result.reason);
+  if (startupErrors.length > 0) {
+    for (const child of startedProcesses) {
+      child.kill("SIGKILL");
+    }
+    throw new AggregateError(
+      startupErrors,
+      "Failed to spawn all log processes",
+    );
+  }
+  return startedProcesses.map((child) => child.stdin);
 }
 
 function parseDestinations(argv) {
@@ -27,19 +72,12 @@ function parseDestinations(argv) {
   });
 }
 
-function openDestination(destination) {
-  if (destination === FANOUT_STDOUT) return process.stdout;
-
-  const [command, ...args] = destination;
-  return spawn(command, args, {
-    stdio: ["pipe", "inherit", "inherit"],
-  }).stdin;
-}
-
 async function fanout(destinations, source = process.stdin) {
-  return new Promise((resolve, reject) => {
-    const outputs = destinations.map(openDestination);
+  const processOutputs = await openProcessOutputs(destinations);
+  const specialOutputs = getSpecialOutputs(destinations);
+  const outputs = [...processOutputs, ...specialOutputs];
 
+  return new Promise((resolve, reject) => {
     for (const output of outputs) {
       source.pipe(output);
     }
