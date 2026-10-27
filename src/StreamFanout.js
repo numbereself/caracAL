@@ -6,6 +6,7 @@ const { finished } = require("node:stream/promises");
 // Both deadlines start on the first shutdown signal or when draining begins.
 const STREAM_SHUTDOWN_TIMEOUT_MS = 5_000;
 const PROCESS_SHUTDOWN_TIMEOUT_MS = 6_000;
+const SINK_STREAM_COMPLETE = Symbol("SINK_STREAM_COMPLETE");
 
 function isCommandArray(command) {
   return (
@@ -24,7 +25,7 @@ function isDestination(value) {
   return isSpecialDestination(value) || isCommandArray(value);
 }
 
-function getSpecialOutputs(destinations) {
+function getSpecialSinkStreams(destinations) {
   return destinations.filter(isSpecialDestination).map(() => process.stdout);
 }
 
@@ -37,11 +38,11 @@ function spawnDestinationProcesses(destinations) {
 }
 
 async function waitForProcessStartup(children) {
-  const startProcessTasks = children.map(async (child) => {
+  const processStartupTasks = children.map(async (child) => {
     await once(child, "spawn");
     return child;
   });
-  const startupResults = await Promise.allSettled(startProcessTasks);
+  const startupResults = await Promise.allSettled(processStartupTasks);
   const startedProcesses = startupResults
     .filter((result) => result.status === "fulfilled")
     .map((result) => result.value);
@@ -85,15 +86,14 @@ function parseDestinations(argv) {
 async function fanout(destinations, source = process.stdin) {
   const children = spawnDestinationProcesses(destinations);
   await waitForProcessStartup(children);
-  const processOutputs = children.map((child) => child.stdin);
-  const specialOutputs = getSpecialOutputs(destinations);
-  const outputs = [...processOutputs, ...specialOutputs];
+  const processSinkStreams = children.map((child) => child.stdin);
+  const specialSinkStreams = getSpecialSinkStreams(destinations);
+  const sinkStreams = [...processSinkStreams, ...specialSinkStreams];
 
-  let isFinishing = false;
   let firstError = null;
   let streamShutdownTimer = null;
   let processTimeoutTask = null;
-  const { promise: streamTimeoutTask, resolve: resolveStreamTimeout } =
+  const { promise: streamTimeoutTask, reject: rejectStreamTimeout } =
     Promise.withResolvers();
 
   function recordError(err) {
@@ -105,53 +105,29 @@ async function fanout(destinations, source = process.stdin) {
   function scheduleShutdownDeadlines() {
     if (streamShutdownTimer != null) return;
     streamShutdownTimer = setTimeout(() => {
-      beginDraining(new Error("Timed out draining output streams"));
-      resolveStreamTimeout();
+      rejectStreamTimeout(new Error("Timed out draining sink streams"));
     }, STREAM_SHUTDOWN_TIMEOUT_MS).unref();
     processTimeoutTask = new Promise((resolve) => {
       setTimeout(() => resolve(), PROCESS_SHUTDOWN_TIMEOUT_MS).unref();
     });
-  }
-  function beginDraining(err) {
-    //TODO this would be easier to read if draining was a promise
-    //and this promise was read before cleanup and did all these ops
-    //we might not even need to represent the promise explicitly.
-    recordError(err);
-    if (isFinishing) return;
-    isFinishing = true;
-    scheduleShutdownDeadlines();
-    source.unpipe();
-    source.destroy();
-
-    for (const output of outputs) {
-      if (!output.destroyed && !output.writableEnded) {
-        output.end();
-      }
-    }
   }
 
   const sourceTask = finished(source, {
     readable: true,
     writable: false,
     cleanup: true,
-  }).then(
-    () => beginDraining(),
-    (err) => beginDraining(err),
-  );
+  });
 
-  const waitForShutdownTasks = outputs.map((output) =>
-    finished(output, {
+  const sinkStreamCompletedTasks = sinkStreams.map((sinkStream) =>
+    finished(sinkStream, {
       readable: false,
       writable: true,
       cleanup: true,
     }).then(
-      () => {
-        if (!isFinishing)
-          beginDraining(new Error("Output finished before input"));
-      },
+      () => SINK_STREAM_COMPLETE,
       (err) => {
-        output.destroy();
-        beginDraining(err);
+        sinkStream.destroy();
+        throw err;
       },
     ),
   );
@@ -161,20 +137,49 @@ async function fanout(destinations, source = process.stdin) {
     process.on(signal, onShutdownSignal);
   }
 
-  for (const output of outputs) {
-    source.pipe(output, { end: false });
+  for (const sinkStream of sinkStreams) {
+    source.pipe(sinkStream, { end: false });
   }
-  if (outputs.length === 0) {
+  if (sinkStreams.length === 0) {
     source.resume();
   }
 
-  await Promise.race([
-    Promise.all([sourceTask, ...waitForShutdownTasks]),
-    streamTimeoutTask,
-  ]);
+  try {
+    const firstStreamCompletion = await Promise.race([
+      streamTimeoutTask,
+      sourceTask,
+      ...sinkStreamCompletedTasks,
+    ]);
+    if (firstStreamCompletion === SINK_STREAM_COMPLETE)
+      throw new Error("Sink stream finished before source");
+  } catch (err) {
+    recordError(err);
+  }
+
+  scheduleShutdownDeadlines();
+  source.unpipe();
+  source.destroy();
+  for (const sinkStream of sinkStreams) {
+    if (!sinkStream.destroyed && !sinkStream.writableEnded) {
+      sinkStream.end();
+    }
+  }
+
+  try {
+    const allSinkStreamsSettled = Promise.allSettled(sinkStreamCompletedTasks);
+    await Promise.race([
+      allSinkStreamsSettled,
+      streamTimeoutTask,
+    ]);
+    const sinkStreamsCompletedSuccessfully = Promise.all(sinkStreamCompletedTasks);
+    await sinkStreamsCompletedSuccessfully;
+  } catch (err) {
+    recordError(err);
+  }
+
   clearTimeout(streamShutdownTimer);
-  for (const output of outputs) {
-    output.destroy();
+  for (const sinkStream of sinkStreams) {
+    sinkStream.destroy();
   }
 
   const processExitTask = Promise.all(children.map(waitForProcessExit));
