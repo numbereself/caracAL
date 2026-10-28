@@ -1,7 +1,14 @@
-const { COORDINATOR_MODULE_PATH, FANOUT_STDOUT } = require("./src/CONSTANTS");
+const {
+  COORDINATOR_MODULE_PATH,
+  FANOUT_STDOUT,
+  SHUTDOWN_SIGNALS,
+} = require("./src/CONSTANTS");
 const ConfigUtil = require("./src/ConfigUtil");
 const fs = require("fs");
 const { spawn } = require("node:child_process");
+
+// Coordinator budget from REFACTORING.md; logging must outlive its source.
+const COORDINATOR_SHUTDOWN_TIMEOUT_MS = 4_000;
 
 function spawnLogFanout(destinations) {
   const destinationArgs = destinations.map((command) =>
@@ -9,12 +16,6 @@ function spawnLogFanout(destinations) {
   );
   return spawn("node", ["./src/StreamFanout.js", ...destinationArgs], {
     stdio: ["pipe", "inherit", "inherit"],
-  });
-}
-
-function spawnWithOutput(command, args, output) {
-  return spawn(command, args, {
-    stdio: ["inherit", output, output],
   });
 }
 
@@ -52,10 +53,10 @@ async function startWebpack(cfg) {
     });
     console.log("Initial WebPack is done");
     const webpackFanout = spawnLogFanout(webpack_log_output);
-    const watcher = spawnWithOutput(
+    const watcher = spawn(
       "node",
       ["./node_modules/webpack/bin/webpack", "--no-color", "--watch"],
-      webpackFanout.stdin,
+      { stdio: ["inherit", webpackFanout.stdin, webpackFanout.stdin] },
     );
     webpackFanout.stdin.destroy();
     return watcher;
@@ -76,11 +77,9 @@ function startCoordinator(cfg) {
     ["node", "./standalones/LogPrinter.js"],
   ];
   const logFanout = spawnLogFanout(log_sinks);
-  const coordinator = spawnWithOutput(
-    "node",
-    [COORDINATOR_MODULE_PATH],
-    logFanout.stdin,
-  );
+  const coordinator = spawn("node", [COORDINATOR_MODULE_PATH], {
+    stdio: ["inherit", logFanout.stdin, logFanout.stdin, "ipc"],
+  });
   // Release only our copy; the coordinator owns its inherited endpoints.
   logFanout.stdin.destroy();
   return coordinator;
@@ -93,10 +92,32 @@ function startCoordinator(cfg) {
   const webpack = await startWebpack(cfg);
   const coordinator = startCoordinator(cfg);
 
-  //TODO coordinate graceful termination on SIGINT etc
-  //a cross-platform solution to this will require an ipc to coordinator for sending termination
   //TODO use automatic exit with code instead of manual hard exit
+  //TODO beautifying this class like StreamFanout should be done eventually
+  //this would include a well-thought-out concept like StreamFanout too
+
+  let isStopping = false;
+  let shutdownTimer;
+  const onShutdownSignal = () => {
+    if (isStopping) return;
+    isStopping = true;
+    shutdownTimer = setTimeout(
+      () => coordinator.kill("SIGKILL"),
+      COORDINATOR_SHUTDOWN_TIMEOUT_MS,
+    ).unref();
+    if (coordinator.connected) {
+      coordinator.send({ type: "terminate" }, (err) => {
+        // If IPC fails, the deadline still enforces termination.
+        if (err)
+          console.error("Failed to request coordinator termination:", err);
+      });
+    }
+  };
+  for (const signal of SHUTDOWN_SIGNALS) {
+    process.on(signal, onShutdownSignal);
+  }
   coordinator.on("exit", (code) => {
+    clearTimeout(shutdownTimer);
     webpack?.kill();
     process.exit(code ?? 1);
   });
