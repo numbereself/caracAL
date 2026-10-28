@@ -1,7 +1,7 @@
 const vm = require("vm");
 const io = require("socket.io-client");
 const fs = require("fs").promises;
-const { JSDOM } = require("jsdom");
+const { JSDOM, CookieJar } = require("jsdom");
 const node_query = require("jquery");
 const game_files = require("../game_files");
 const fetch = (...args) =>
@@ -64,9 +64,13 @@ const html_spoof = `<!DOCTYPE html>
 </body>
 </html>`;
 
+const characterSessionCookieJar = new CookieJar();
+
 function make_context(upper = null) {
-  const result = new JSDOM(html_spoof, { url: "https://adventure.land/" })
-    .window;
+  const result = new JSDOM(html_spoof, {
+    url: "https://adventure.land/",
+    cookieJar: characterSessionCookieJar,
+  }).window;
   //jsdom maked globalThis point to Node global
   //but we want it to be window instead
   result.globalThis = result;
@@ -249,6 +253,10 @@ async function make_game(proc_args) {
   game_context.server_port = proc_args.realm_port;
   game_context.user_id = proc_args.sess.split("-")[0];
   game_context.user_auth = proc_args.sess.split("-")[1];
+  characterSessionCookieJar.setCookieSync(
+    `auth=${proc_args.sess}; Path=/`,
+    game_context.location.href,
+  );
   game_context.character_to_load = proc_args.cid;
 
   //expose the block under parent.caracAL
