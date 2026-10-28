@@ -167,11 +167,10 @@ async function fanout(destinations, source = process.stdin) {
 
   try {
     const allSinkStreamsSettled = Promise.allSettled(sinkStreamCompletedTasks);
-    await Promise.race([
-      allSinkStreamsSettled,
-      streamTimeoutTask,
-    ]);
-    const sinkStreamsCompletedSuccessfully = Promise.all(sinkStreamCompletedTasks);
+    await Promise.race([allSinkStreamsSettled, streamTimeoutTask]);
+    const sinkStreamsCompletedSuccessfully = Promise.all(
+      sinkStreamCompletedTasks,
+    );
     await sinkStreamsCompletedSuccessfully;
   } catch (err) {
     recordError(err);
