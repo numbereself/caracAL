@@ -6,12 +6,12 @@ class FileStoredKeyValues {
   #replacer_path;
   #backend;
   #handle;
-  #refactorTask;
+  #compactionTimer;
 
   constructor(
     main_path = "garage.jsonl",
     replacer_path = "garage.new.jsonl",
-    refactor_interval = 30e3,
+    compaction_interval = 30e3,
   ) {
     if (main_path === replacer_path) {
       throw new Error(
@@ -21,65 +21,87 @@ class FileStoredKeyValues {
     this.#main_path = main_path;
     this.#replacer_path = replacer_path;
     this.#backend = new Map();
-    this.#initializeHandle();
-    this.#refactorTask = setInterval(() => this.refactor(), refactor_interval);
-    this.refactor();
+    this.#handle = this.#openHandle();
+    this.#loadEntries();
+    this.#compactionTimer = setInterval(
+      () => this.compact(),
+      compaction_interval,
+    );
+    this.compact();
   }
 
-  #checkFileExistence(path) {
-    let handle = null;
+  #openHandle() {
     try {
-      handle = fs.openSync(path, "r");
+      return fs.openSync(
+        this.#main_path,
+        fs.constants.O_RDWR | fs.constants.O_APPEND,
+      );
     } catch (err) {
-      return false;
-    } finally {
-      if (handle !== null) {
-        fs.closeSync(handle);
+      if (err.code !== "ENOENT") throw err;
+      try {
+        fs.renameSync(this.#replacer_path, this.#main_path);
+      } catch (possibleRenameError) {
+        if (possibleRenameError.code !== "ENOENT") throw possibleRenameError;
       }
+      return fs.openSync(
+        this.#main_path,
+        fs.constants.O_RDWR | fs.constants.O_CREAT | fs.constants.O_APPEND,
+      );
     }
-    return true;
   }
 
-  #initializeHandle() {
-    if (
-      this.#checkFileExistence(this.#replacer_path) &&
-      !this.#checkFileExistence(this.#main_path)
-    ) {
-      fs.renameSync(this.#replacer_path, this.#main_path);
-    }
-    this.#handle = fs.openSync(this.#main_path, "a+");
+  #loadEntries() {
     const handle_contents = fs.readFileSync(this.#handle, "utf8").split("\n");
     for (let line of handle_contents) {
-      if (line.length > 0) {
-        const [key, value] = entries(JSON.parse(line))[0];
+      const trimmed_line = line.trim();
+      if (trimmed_line.length === 0) continue;
+      try {
+        const [key, value] = entries(JSON.parse(trimmed_line))[0];
         if (value === null) {
           this.#backend.delete(key);
         } else {
           this.#backend.set(key, value);
         }
+      } catch (err) {
+        console.error(
+          `FileStoredKeyValues: skipping corrupt line (${
+            err.message
+          }): ${trimmed_line.slice(0, 120)}`,
+        );
       }
     }
   }
 
-  refactor() {
-    //this method writes the current contents without history
-    //it writes to a temp file then replaces original
-    //this guarantees that data will never be lost
+  compact() {
+    // Write and sync a replacement before renaming it over the original.
+    // Keep the original handle usable if preparing or renaming fails.
     const k_v_list = [];
     for (let [key, value] of this.#backend.entries()) {
       k_v_list.push(JSON.stringify({ [key]: value }) + "\n");
     }
-    fs.writeFileSync(this.#replacer_path, k_v_list.join(""), {
-      encoding: "utf8",
-    });
-    fs.closeSync(this.#handle);
-    fs.unlinkSync(this.#main_path);
-    fs.renameSync(this.#replacer_path, this.#main_path);
-    this.#handle = fs.openSync(this.#main_path, "a");
+    const fd = fs.openSync(
+      this.#replacer_path,
+      fs.constants.O_WRONLY |
+        fs.constants.O_CREAT |
+        fs.constants.O_TRUNC |
+        fs.constants.O_APPEND,
+    );
+    try {
+      fs.writeFileSync(fd, k_v_list.join(""), { encoding: "utf8" });
+      fs.fsyncSync(fd);
+      fs.renameSync(this.#replacer_path, this.#main_path);
+    } catch (err) {
+      fs.closeSync(fd);
+      throw err;
+    }
+    const old_handle = this.#handle;
+    this.#handle = fd;
+    fs.closeSync(old_handle);
   }
 
   close() {
-    clearInterval(this.#refactorTask);
+    clearInterval(this.#compactionTimer);
+    fs.fsyncSync(this.#handle);
     fs.closeSync(this.#handle);
   }
 

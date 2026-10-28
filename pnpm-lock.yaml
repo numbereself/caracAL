@@ -169,9 +169,6 @@ importers:
       bot-web-interface:
         specifier: ^2.0.14
         version: 2.0.14(supports-color@8.1.1)
-      cloneable-readable:
-        specifier: ^3.0.0
-        version: 3.0.0
       colorette:
         specifier: ^2.0.20
         version: 2.0.20
@@ -542,9 +539,6 @@ packages:
   clone@1.0.4:
     resolution: {integrity: sha512-JQHZ2QMW6l3aH/j6xCqQThY/9OH4D/9ls34cgkUBiEeocRTU04tHfKPBsUK1PqZCUQM7GiA0IIXJSuXHI64Kbg==}
     engines: {node: '>=0.8'}
-
-  cloneable-readable@3.0.0:
-    resolution: {integrity: sha512-Lkfd9IRx1nfiBr7UHNxJSl/x7DOeUfYmxzCkxYJC2tyc/9vKgV75msgLGurGQsak/NvJDHMWcshzEXRlxfvhqg==}
 
   color-convert@2.0.1:
     resolution: {integrity: sha512-RRECPsj7iu/xb5oKYcsFHSppFNnsj/52OVTRKb4zP5onXwVF3zVmmToNcOfGC+CRDpfK/U584fMg38ZHCaElKQ==}
@@ -2194,10 +2188,6 @@ snapshots:
       shallow-clone: 3.0.1
 
   clone@1.0.4: {}
-
-  cloneable-readable@3.0.0:
-    dependencies:
-      readable-stream: 4.8.0
 
   color-convert@2.0.1:
     dependencies:

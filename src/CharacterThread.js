@@ -8,6 +8,7 @@ const fetch = (...args) =>
   import("node-fetch").then(({ default: fetch }) => fetch(...args));
 const monitoring_util = require("../monitoring_util");
 const ipc_storage = require("../ipcStorage");
+const { IPC_TERMINATE, SHUTDOWN_SIGNALS } = require("./CONSTANTS");
 
 const LogUtils = require("./LogUtils");
 const { console } = LogUtils;
@@ -15,6 +16,44 @@ const { console } = LogUtils;
 process.on("unhandledRejection", function (exception) {
   console.warn("promise rejected: \n", exception);
 });
+
+let shutting_down = false;
+let runner_cleanup = null;
+
+function terminate() {
+  if (shutting_down) return;
+  shutting_down = true;
+  let exit_code = 0;
+  try {
+    console.log("terminating self");
+    // During startup there may not yet be a runner to clean up.
+    if (runner_cleanup !== null) {
+      runner_cleanup();
+    }
+  } catch (err) {
+    exit_code = 1;
+    console.error("runner cleanup error:", err);
+  } finally {
+    process.exit(exit_code);
+  }
+}
+
+// Without a coordinator, stop rather than continue playing uncoordinated.
+process.on("disconnect", terminate);
+process.on("message", (m) => {
+  if (m.type === IPC_TERMINATE) terminate();
+});
+
+SHUTDOWN_SIGNALS.forEach((signal) =>
+  process.on(signal, () => {
+    if (shutting_down) return;
+    // Let the coordinator disable restarts before asking us to terminate.
+    console.log(`Received ${signal} on client. Requesting termination`);
+    process.send({ type: "shutdown" }, (err) => {
+      if (err) terminate();
+    });
+  }),
+);
 
 const html_spoof = `<!DOCTYPE html>
 <html>
@@ -161,27 +200,7 @@ async function make_runner(upper, CODE_file, version, is_typescript) {
     runner_context,
   );
 
-  process.on("message", (m) => {
-    switch (m.type) {
-      case "closing_client":
-        console.log("terminating self");
-        vm.runInContext("on_destroy()", runner_context);
-        process.exit();
-    }
-  });
-
-  //so.
-  //these should send a shutdown to parent
-  //parent deletes instance and marks them inactive
-  //if its duplicate then no instance and no double shutdown
-  ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) =>
-    process.on(signal, async () => {
-      console.log(`Received ${signal} on client. Requesting termination`);
-      process.send({
-        type: "shutdown",
-      });
-    }),
-  );
+  runner_cleanup = () => vm.runInContext("on_destroy()", runner_context);
 
   //awaits the arrival of a message from parent process
   //indicating the servers_and_characters proxy that we use

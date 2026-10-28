@@ -1,9 +1,26 @@
-const { COORDINATOR_MODULE_PATH } = require("./src/CONSTANTS");
+const {
+  COORDINATOR_MODULE_PATH,
+  FANOUT_STDOUT,
+  SHUTDOWN_SIGNALS,
+  IPC_TERMINATE,
+} = require("./src/CONSTANTS");
 const ConfigUtil = require("./src/ConfigUtil");
-const StreamMultiplexer = require("./src/StreamMultiplexer");
 const fs = require("fs");
+const { spawn } = require("node:child_process");
 
-async function get_webpack_started(cfg) {
+// Coordinator budget from REFACTORING.md; logging must outlive its source.
+const COORDINATOR_SHUTDOWN_TIMEOUT_MS = 4_000;
+
+function spawnLogFanout(destinations) {
+  const destinationArgs = destinations.map((command) =>
+    JSON.stringify(command),
+  );
+  return spawn("node", ["./src/StreamFanout.js", ...destinationArgs], {
+    stdio: ["pipe", "inherit", "inherit"],
+  });
+}
+
+async function startWebpack(cfg) {
   try {
     fs.rmSync("./TYPECODE.out", { recursive: true });
   } catch (error) {
@@ -22,37 +39,32 @@ async function get_webpack_started(cfg) {
         "--size",
         "4500000",
       ],
-      null,
+      FANOUT_STDOUT,
     ];
     //Run webpack once so we are guaranteed to have the compiled files
-    let wp_seed;
     console.log("Starting Initial WebPack");
-    //initially we do not use log_pipes because when the process terminates it will close our stdin/out
-    wp_seed = StreamMultiplexer.spawn_sink(
+    const initialBuild = spawn(
       "node",
-      "./node_modules/webpack/bin/webpack",
-      "--no-color",
+      ["./node_modules/webpack/bin/webpack", "--no-color"],
+      { stdio: "inherit" },
     );
 
     await new Promise((resolve) => {
-      wp_seed.on("close", resolve);
+      initialBuild.on("close", resolve);
     });
     console.log("Initial WebPack is done");
-    wp_seed = StreamMultiplexer.setup_log_pipes(
-      webpack_log_output,
-      "./node_modules/webpack/bin/webpack",
-      "--no-color",
-      "--watch",
+    const webpackFanout = spawnLogFanout(webpack_log_output);
+    const watcher = spawn(
+      "node",
+      ["./node_modules/webpack/bin/webpack", "--no-color", "--watch"],
+      { stdio: ["inherit", webpackFanout.stdin, webpackFanout.stdin] },
     );
+    webpackFanout.stdin.destroy();
+    return watcher;
   }
 }
 
-(async () => {
-  await ConfigUtil.interactive();
-
-  const cfg = require("./config");
-  await get_webpack_started(cfg);
-
+function startCoordinator(cfg) {
   const log_sinks = cfg.log_sinks || [
     [
       "node",
@@ -65,5 +77,49 @@ async function get_webpack_started(cfg) {
     ],
     ["node", "./standalones/LogPrinter.js"],
   ];
-  StreamMultiplexer.setup_log_pipes(log_sinks, COORDINATOR_MODULE_PATH);
+  const logFanout = spawnLogFanout(log_sinks);
+  const coordinator = spawn("node", [COORDINATOR_MODULE_PATH], {
+    stdio: ["inherit", logFanout.stdin, logFanout.stdin, "ipc"],
+  });
+  // Release only our copy; the coordinator owns its inherited endpoints.
+  logFanout.stdin.destroy();
+  return coordinator;
+}
+
+(async () => {
+  await ConfigUtil.interactive();
+
+  const cfg = require("./config");
+  const webpack = await startWebpack(cfg);
+  const coordinator = startCoordinator(cfg);
+
+  //TODO use automatic exit with code instead of manual hard exit
+  //TODO beautifying this class like StreamFanout should be done eventually
+  //this would include a well-thought-out concept like StreamFanout too
+
+  let isStopping = false;
+  let shutdownTimer;
+  const onShutdownSignal = () => {
+    if (isStopping) return;
+    isStopping = true;
+    shutdownTimer = setTimeout(
+      () => coordinator.kill("SIGKILL"),
+      COORDINATOR_SHUTDOWN_TIMEOUT_MS,
+    ).unref();
+    if (coordinator.connected) {
+      coordinator.send({ type: IPC_TERMINATE }, (err) => {
+        // If IPC fails, the deadline still enforces termination.
+        if (err)
+          console.error("Failed to request coordinator termination:", err);
+      });
+    }
+  };
+  for (const signal of SHUTDOWN_SIGNALS) {
+    process.on(signal, onShutdownSignal);
+  }
+  coordinator.on("exit", (code) => {
+    clearTimeout(shutdownTimer);
+    webpack?.kill();
+    process.exit(code ?? 1);
+  });
 })();
