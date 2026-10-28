@@ -8,6 +8,7 @@ const fetch = (...args) =>
   import("node-fetch").then(({ default: fetch }) => fetch(...args));
 const monitoring_util = require("../monitoring_util");
 const ipc_storage = require("../ipcStorage");
+const { IPC_TERMINATE } = require("./CONSTANTS");
 
 const LogUtils = require("./LogUtils");
 const { console } = LogUtils;
@@ -166,7 +167,7 @@ async function make_runner(upper, CODE_file, version, is_typescript) {
 
   process.on("message", (m) => {
     switch (m.type) {
-      case "closing_client":
+      case IPC_TERMINATE:
         console.log("terminating self");
         vm.runInContext("on_destroy()", runner_context);
         process.exit();

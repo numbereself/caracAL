@@ -2,6 +2,7 @@ const {
   COORDINATOR_MODULE_PATH,
   FANOUT_STDOUT,
   SHUTDOWN_SIGNALS,
+  IPC_TERMINATE,
 } = require("./src/CONSTANTS");
 const ConfigUtil = require("./src/ConfigUtil");
 const fs = require("fs");
@@ -106,7 +107,7 @@ function startCoordinator(cfg) {
       COORDINATOR_SHUTDOWN_TIMEOUT_MS,
     ).unref();
     if (coordinator.connected) {
-      coordinator.send({ type: "terminate" }, (err) => {
+      coordinator.send({ type: IPC_TERMINATE }, (err) => {
         // If IPC fails, the deadline still enforces termination.
         if (err)
           console.error("Failed to request coordinator termination:", err);

@@ -9,6 +9,8 @@ const {
   LOCALSTORAGE_PATH,
   LOCALSTORAGE_ROTA_PATH,
   STAT_BEAT_INTERVAL,
+  SHUTDOWN_SIGNALS,
+  IPC_TERMINATE,
 } = require("../src/CONSTANTS");
 const { log, console, ctype_to_clid } = require("../src/LogUtils");
 
@@ -16,6 +18,7 @@ const FileStoredKeyValues = require("../src/FileStoredKeyValues");
 
 const INITIAL_RESTART_DELAY_MS = 1_000;
 const MAX_RESTART_DELAY_MS = 60_000;
+const CHARACTER_SHUTDOWN_TIMEOUT_MS = 1_000;
 
 function reset_backoff(char_block) {
   char_block.restart_backoff = 0;
@@ -171,10 +174,10 @@ function migrate_old_storage(path, localStorage) {
       if (char_block.connected) {
         console.log("telling client to self-terminate");
         safe_send(proc, {
-          type: "closing_client",
+          type: IPC_TERMINATE,
         });
         const ended_graceful = await Promise.race([
-          sleep(500),
+          sleep(CHARACTER_SHUTDOWN_TIMEOUT_MS),
           new Promise((resolve) => {
             proc.on("exit", function () {
               console.log("Client terminated gracefully");
@@ -418,33 +421,40 @@ function migrate_old_storage(path, localStorage) {
 
     return result;
   }
-  //TODO beta new logic for #5
-  //i need to implement decent lifecycle-handling
 
   let shutting_down = false;
-  ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) =>
-    process.on(signal, async () => {
-      // Ctrl-C reaches the coordinator twice: from the terminal and through main.js
-      if (shutting_down) return;
-      shutting_down = true;
-      setTimeout(() => process.exit(1), 15_000).unref(); // never longer than 15 s
-      console.log(`Received ${signal} on master. Rounding up clients`);
-      //softkill all chars, giving them chance to shutdown
-      await Promise.all(
-        Object.values(character_manage).map((char_block) => {
-          char_block.enabled = false;
-          return softkill_block(char_block);
-        }),
-      );
-      console.log("flushing localStorage to disk");
-      try {
-        localStorage.close();
-      } catch (err) {
-        console.error("localStorage close error:", err);
-      }
-      console.log("now truly exiting");
-      process.exit();
-    }),
+  async function terminate(reason) {
+    // Ctrl-C can reach us both directly and through the launcher's IPC.
+    if (shutting_down) return;
+    shutting_down = true;
+    console.log(`Received ${reason} on master. Rounding up clients`);
+    //softkill all chars, giving them chance to shutdown
+    await Promise.all(
+      Object.values(character_manage).map((char_block) => {
+        char_block.enabled = false;
+        return softkill_block(char_block);
+      }),
+    );
+    console.log("flushing localStorage to disk");
+    try {
+      localStorage.close();
+    } catch (err) {
+      console.error("localStorage close error:", err);
+    }
+    console.log("now truly exiting");
+    process.exit();
+  }
+
+  process.on("message", (m) => {
+    switch (m.type) {
+      case IPC_TERMINATE:
+        terminate("IPC terminate");
+        break;
+    }
+  });
+
+  SHUTDOWN_SIGNALS.forEach((signal) =>
+    process.on(signal, () => terminate(signal)),
   );
   //TODO enable sooft shutdown from coordinator
   const tasks = Object.keys(character_manage).forEach((c_name) => {
