@@ -236,7 +236,7 @@ async function make_game(proc_args) {
   const game_sources = ["./html_vars.js"]
     .concat(
       game_files
-        .get_game_files()
+        .get_game_files(proc_args.version)
         .map((f) => game_files.locate_game_file(f, proc_args.version)),
     )
     .concat(["./html_init.js"]);

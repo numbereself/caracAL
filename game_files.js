@@ -1,6 +1,6 @@
 const base_url = "https://adventure.land";
 const fs = require("fs").promises;
-const { createWriteStream } = require("fs");
+const { createWriteStream, readFileSync } = require("fs");
 const { pipeline } = require("stream");
 const { promisify } = require("util");
 const streamPipeline = promisify(pipeline);
@@ -18,7 +18,60 @@ function get_runner_files() {
   ];
 }
 
-function get_game_files() {
+//vendor scripts the game page loads that we leave out: the node context
+//provides its own jquery/io/bowser, the rest only matter with a real browser
+const skipped_scripts = [
+  /^\/js\/pixi-/,
+  /^\/js\/socket\.io\//,
+  /^\/js\/jquery\//,
+  /^\/js\/howler\//,
+  /^\/js\/libraries\/(jquery|bowser)/,
+  /^\/js\/codemirror\/(?!.*\/codemirror\.js$)/,
+  /^\/js\/ios-drag-drop\.js$/,
+];
+//vendor scripts the game code needs to exist, swapped for the no-op versions
+//the server hosts
+const substituted_scripts = [
+  [/^\/js\/pixi\/[^/]+\/pixi\.min\.js$/, "/js/pixi/fake/pixi.min.js"],
+  [
+    /^\/js\/codemirror\/[^/]+\/codemirror\.js$/,
+    "/js/codemirror/fake/codemirror.js",
+  ],
+];
+
+//the script tags of the game page, in page order
+function parse_game_files(html) {
+  const result = [];
+  for (const match of html.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)) {
+    let src = match[1].split("?")[0];
+    if (!src.startsWith("/") || skipped_scripts.some((x) => x.test(src))) {
+      continue;
+    }
+    for (const [pattern, replacement] of substituted_scripts) {
+      if (pattern.test(src)) src = replacement;
+    }
+    if (!result.includes(src)) result.push(src);
+  }
+  //game files are stored flat, see locate_game_file
+  const basenames = result.map((x) => path.posix.basename(x));
+  const clash = basenames.find((x, i) => basenames.indexOf(x) != i);
+  if (clash) {
+    throw new Error(`game files share the file name ${clash}`);
+  }
+  return result;
+}
+
+function locate_manifest(version) {
+  return `./game_files/${version}/manifest.json`;
+}
+
+function get_game_files(version) {
+  try {
+    return JSON.parse(readFileSync(locate_manifest(version), "utf8"));
+  } catch (e) {
+    if (e.code != "ENOENT") throw e;
+  }
+  //versions downloaded before manifests existed
   return [
     "/js/pixi/fake/pixi.min.js",
     "/js/libraries/combined.js",
@@ -75,10 +128,21 @@ async function download_file(url, file_p) {
     throw new Error(`failed to download ${url}: ${response.statusText}`);
   }
 
-  return await streamPipeline(response.body, createWriteStream(file_p));
+  //write aside and rename, so a file only exists once it is complete
+  await streamPipeline(response.body, createWriteStream(file_p + ".part"));
+  await fs.rename(file_p + ".part", file_p);
 }
 
-async function get_latest_version() {
+async function file_exists(file_p) {
+  try {
+    await fs.access(file_p);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function get_latest() {
   const raw = await fetch(base_url);
   if (!raw.ok) {
     throw new Error(`failed to check version: ${raw.statusText}`);
@@ -88,7 +152,7 @@ async function get_latest_version() {
   if (!match) {
     throw new Error(`malformed version response`);
   }
-  return parseInt(match[1]);
+  return { version: parseInt(match[1]), game_files: parse_game_files(html) };
 }
 
 function locate_game_file(resource, version) {
@@ -96,29 +160,50 @@ function locate_game_file(resource, version) {
 }
 
 async function ensure_latest() {
-  const version = await get_latest_version();
-  if ((await available_versions()).includes(version)) {
+  const { version, game_files } = await get_latest();
+  const fpath = "./game_files/" + version;
+  const is_new = !(await available_versions()).includes(version);
+  const target_files = game_files
+    .concat(get_runner_files())
+    //remove duplicates
+    .filter(function (item, pos, self) {
+      return self.indexOf(item) == pos;
+    });
+  //the page can gain scripts without a version bump, and older downloads
+  //may predate the scraping, so an existing folder gets topped up too
+  const missing = [];
+  for (const itm of target_files) {
+    if (is_new || !(await file_exists(locate_game_file(itm, version)))) {
+      missing.push(itm);
+    }
+  }
+  if (missing.length == 0) {
     console.log(`version ${version} is already downloaded`);
   } else {
-    console.log(`downloading version ${version}`);
-    const fpath = "./game_files/" + version;
+    if (is_new) {
+      console.log(`downloading version ${version}`);
+    } else {
+      console.log(
+        `version ${version} is missing ${missing.length} files, downloading them`,
+      );
+    }
+    console.debug("downloading files:\n%s", missing);
     try {
-      await fs.mkdir(fpath);
-      const target_files = get_game_files()
-        .concat(get_runner_files())
-        //remove duplicates
-        .filter(function (item, pos, self) {
-          return self.indexOf(item) == pos;
-        });
-      const tasks = target_files.map((itm) =>
+      if (is_new) await fs.mkdir(fpath);
+      const tasks = missing.map((itm) =>
         download_file(base_url + itm, locate_game_file(itm, version)),
       );
       await Promise.all(tasks);
     } catch (e) {
-      await fs.rmdir(fpath, { recursive: true });
+      //a folder that was already there is still usable, leave it be
+      if (is_new) await fs.rmdir(fpath, { recursive: true });
       throw e;
     }
   }
+  await fs.writeFile(
+    locate_manifest(version),
+    JSON.stringify(game_files, null, 2),
+  );
   return version;
 }
 exports.cull_versions = cull_versions;
