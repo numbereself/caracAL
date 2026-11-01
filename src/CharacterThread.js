@@ -117,6 +117,24 @@ function make_handler_safe_io(io) {
   }, io);
 }
 
+//the coordinator lets one character per account log in at a time
+function await_login_turn() {
+  return new Promise((resolve) => {
+    const on_message = (m) => {
+      if (m.type == "login_turn_grant") {
+        process.off("message", on_message);
+        resolve();
+      }
+    };
+    process.on("message", on_message);
+    process.send({ type: "login_turn_request" });
+  });
+}
+
+function release_login_turn() {
+  process.send({ type: "login_turn_release" });
+}
+
 async function make_runner(upper, CODE_file, version, is_typescript) {
   const runner_sources = game_files
     .get_runner_files()
@@ -287,6 +305,7 @@ async function make_game(proc_args) {
   game_context.new_game_logic = function () {
     old_ng_logic();
     clearTimeout(reload_task);
+    release_login_turn();
     //people reported bad performance when switching maps
     //and this allegedly fixes it.
     vm.runInContext("pause()", game_context);
@@ -309,7 +328,20 @@ async function make_game(proc_args) {
   const old_dc = game_context.disconnect;
   game_context.disconnect = function () {
     old_dc();
-    extensions.deploy();
+    release_login_turn();
+    const reason = game_context.disconnect_reason;
+    if (
+      typeof reason == "string" &&
+      reason.startsWith("Too many loose connections")
+    ) {
+      //some loose sockets may not be ours, e.g. a browser tab
+      const delay = 1000 + Math.random() * 2000;
+      const seconds = (delay / 1000).toFixed(1);
+      console.log(`too many loose connections, redeploying in ${seconds}s`);
+      setTimeout(() => extensions.deploy(), delay);
+    } else {
+      extensions.deploy();
+    }
   };
   const old_api = game_context.api_call;
   game_context.api_call = function (method, args, r_args) {
@@ -367,6 +399,8 @@ async function make_game(proc_args) {
       }
     }),
   );
+  //the socket opens in the_game(), everything before still runs in parallel
+  await await_login_turn();
   vm.runInContext("the_game()", game_context);
   const reload_timeout = 14;
   const reload_task = setTimeout(

@@ -158,6 +158,57 @@ function migrate_old_storage(path, localStorage) {
     }
   }
 
+  //one login at a time, the server kicks our loose sockets once more than 5 are open
+  const LOGIN_TURN_TIMEOUT = 10000;
+  const login_turn = {
+    holder: null, //{char_name, proc, granted_at, timer}
+    queue: [], //[{char_name, proc}]
+  };
+
+  function login_turn_grant_next() {
+    if (login_turn.holder) return;
+    const next = login_turn.queue.shift();
+    if (!next) return;
+    const holder = { ...next, granted_at: Date.now() };
+    holder.timer = setTimeout(() => {
+      const seconds = LOGIN_TURN_TIMEOUT / 1000;
+      console.warn(
+        `login turn of ${holder.char_name} timed out after ${seconds}s`,
+      );
+      login_turn_release(holder.proc, "timeout");
+    }, LOGIN_TURN_TIMEOUT);
+    login_turn.holder = holder;
+    const waiting = login_turn.queue.map((x) => x.char_name);
+    console.log(
+      `login turn granted to ${holder.char_name}` +
+        (waiting.length > 0 ? ` (waiting: ${waiting.join(", ")})` : ""),
+    );
+    safe_send(holder.proc, { type: "login_turn_grant" });
+  }
+
+  function login_turn_request(char_name, proc) {
+    const holds = login_turn.holder && login_turn.holder.proc === proc;
+    if (holds || login_turn.queue.some((x) => x.proc === proc)) return;
+    login_turn.queue.push({ char_name, proc });
+    login_turn_grant_next();
+  }
+
+  function login_turn_release(proc, reason) {
+    const holder = login_turn.holder;
+    if (!holder || holder.proc !== proc) return;
+    clearTimeout(holder.timer);
+    login_turn.holder = null;
+    const held_for = ((Date.now() - holder.granted_at) / 1000).toFixed(1);
+    console.log(
+      `login turn released by ${holder.char_name} after ${held_for}s (${reason})`,
+    );
+    login_turn_grant_next();
+  }
+
+  function login_turn_dequeue(proc) {
+    login_turn.queue = login_turn.queue.filter((x) => x.proc !== proc);
+  }
+
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
@@ -168,6 +219,7 @@ function migrate_old_storage(path, localStorage) {
     const proc = char_block.instance;
     char_block.instance = null;
     if (proc) {
+      login_turn_dequeue(proc);
       if (char_block.connected) {
         console.log("telling client to self-terminate");
         safe_send(proc, {
@@ -263,6 +315,8 @@ function migrate_old_storage(path, localStorage) {
         char_block.monitor.destroy();
         char_block.monitor = null;
       }
+      login_turn_dequeue(result);
+      login_turn_release(result, "exited");
       char_block.connected = false;
       char_block.instance = null;
       if (char_block.enabled) {
@@ -291,7 +345,14 @@ function migrate_old_storage(path, localStorage) {
           break;
         case "initialized":
           break;
+        case "login_turn_request":
+          login_turn_request(char_name, result);
+          break;
+        case "login_turn_release":
+          login_turn_release(result, "released");
+          break;
         case "connected":
+          login_turn_release(result, "connected");
           reset_backoff(char_block);
           char_block.connected = true;
           update_siblings_and_acc(my_acc.response);
