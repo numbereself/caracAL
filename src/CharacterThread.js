@@ -94,6 +94,29 @@ function patch_no_graphics_skin_change(context) {
   );
 }
 
+//a throw from game code that Node calls into would kill the process, where a
+//browser only logs it (e.g. 18285's "ui" handler reading character before "start")
+function run_game_code(description, fn) {
+  try {
+    return fn();
+  } catch (exception) {
+    console.error(`${description} threw`, exception);
+  }
+}
+
+function make_handler_safe_io(io) {
+  return Object.assign(function (...args) {
+    const socket = io(...args);
+    const emit_event = socket.emitEvent;
+    socket.emitEvent = function (event_args) {
+      return run_game_code(`game "${event_args[0]}" handler`, () =>
+        emit_event.call(this, event_args),
+      );
+    };
+    return socket;
+  }, io);
+}
+
 async function make_runner(upper, CODE_file, version, is_typescript) {
   const runner_sources = game_files
     .get_runner_files()
@@ -165,7 +188,9 @@ async function make_runner(upper, CODE_file, version, is_typescript) {
     switch (m.type) {
       case "closing_client":
         console.log("terminating self");
-        vm.runInContext("on_destroy()", runner_context);
+        run_game_code("on_destroy", () =>
+          vm.runInContext("on_destroy()", runner_context),
+        );
         process.exit();
     }
   });
@@ -220,7 +245,7 @@ async function make_game(proc_args) {
   console.log("constructing game instance");
   console.debug("source files:\n%s", game_sources);
   const game_context = make_context();
-  game_context.io = io;
+  game_context.io = make_handler_safe_io(io);
   game_context.bowser = {};
   await ev_files(game_sources, game_context);
   patch_no_graphics_skin_change(game_context);
@@ -322,24 +347,26 @@ async function make_game(proc_args) {
     game_context,
   );
   process.send({ type: "initialized" });
-  process.on("message", (m) => {
-    switch (m.type) {
-      case "siblings_and_acc":
-        extensions.siblings = m.siblings;
-        game_context.handle_information([m.account]);
-        break;
-      case "receive_cm":
-        game_context.call_code_function("trigger_character_event", "cm", {
-          name: m.name,
-          message: m.data,
-          caracAL: true,
-        });
-        break;
-      case "send_cm":
-        game_context.send_code_message(m.to, m.data);
-        break;
-    }
-  });
+  process.on("message", (m) =>
+    run_game_code(`"${m.type}" message handler`, () => {
+      switch (m.type) {
+        case "siblings_and_acc":
+          extensions.siblings = m.siblings;
+          game_context.handle_information([m.account]);
+          break;
+        case "receive_cm":
+          game_context.call_code_function("trigger_character_event", "cm", {
+            name: m.name,
+            message: m.data,
+            caracAL: true,
+          });
+          break;
+        case "send_cm":
+          game_context.send_code_message(m.to, m.data);
+          break;
+      }
+    }),
+  );
   vm.runInContext("the_game()", game_context);
   const reload_timeout = 14;
   const reload_task = setTimeout(
