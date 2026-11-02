@@ -10,6 +10,9 @@ module.exports = {
   //If you want caracAL to compile TypeScript and use the TYPECODE folder
   //This works by running Webpack in the background
   enable_TYPECODE: true,
+  //how many characters may log in at the same time, 1 to 5
+  //the server kicks all loose sockets of your IP once a 6th one connects
+  login_turn_slots: 1,
   //how much logging you want
   //set to "debug" for more logging and "warn" for less logging
   log_level: "info",

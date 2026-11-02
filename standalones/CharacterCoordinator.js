@@ -158,46 +158,63 @@ function migrate_old_storage(path, localStorage) {
     }
   }
 
-  //one login at a time, the server kicks our loose sockets once more than 5 are open
+  //limits concurrent logins, the server kicks our loose sockets once more than 5 are open
   const LOGIN_TURN_TIMEOUT = 10000;
+  const LOGIN_TURN_MAX_SLOTS = 5;
+  const login_turn_slots = Math.min(
+    Math.max(Math.floor(Number(cfg.login_turn_slots)) || 1, 1),
+    LOGIN_TURN_MAX_SLOTS,
+  );
+  if (
+    cfg.login_turn_slots !== undefined &&
+    Number(cfg.login_turn_slots) !== login_turn_slots
+  ) {
+    console.warn(
+      `login_turn_slots ${cfg.login_turn_slots} is not between 1 and ${LOGIN_TURN_MAX_SLOTS}`,
+    );
+  }
+  console.log(`up to ${login_turn_slots} characters log in at the same time`);
   const login_turn = {
-    holder: null, //{char_name, proc, granted_at, timer}
+    holders: [], //[{char_name, proc, granted_at, timer}]
     queue: [], //[{char_name, proc}]
   };
 
   function login_turn_grant_next() {
-    if (login_turn.holder) return;
-    const next = login_turn.queue.shift();
-    if (!next) return;
-    const holder = { ...next, granted_at: Date.now() };
-    holder.timer = setTimeout(() => {
-      const seconds = LOGIN_TURN_TIMEOUT / 1000;
-      console.warn(
-        `login turn of ${holder.char_name} timed out after ${seconds}s`,
+    while (
+      login_turn.holders.length < login_turn_slots &&
+      login_turn.queue.length > 0
+    ) {
+      const holder = { ...login_turn.queue.shift(), granted_at: Date.now() };
+      holder.timer = setTimeout(() => {
+        const seconds = LOGIN_TURN_TIMEOUT / 1000;
+        console.warn(
+          `login turn of ${holder.char_name} timed out after ${seconds}s`,
+        );
+        login_turn_release(holder.proc, "timeout");
+      }, LOGIN_TURN_TIMEOUT);
+      login_turn.holders.push(holder);
+      const waiting = login_turn.queue.map((x) => x.char_name);
+      console.log(
+        `login turn granted to ${holder.char_name}` +
+          ` (${login_turn.holders.length}/${login_turn_slots} logging in` +
+          (waiting.length > 0 ? `, waiting: ${waiting.join(", ")})` : ")"),
       );
-      login_turn_release(holder.proc, "timeout");
-    }, LOGIN_TURN_TIMEOUT);
-    login_turn.holder = holder;
-    const waiting = login_turn.queue.map((x) => x.char_name);
-    console.log(
-      `login turn granted to ${holder.char_name}` +
-        (waiting.length > 0 ? ` (waiting: ${waiting.join(", ")})` : ""),
-    );
-    safe_send(holder.proc, { type: "login_turn_grant" });
+      safe_send(holder.proc, { type: "login_turn_grant" });
+    }
   }
 
   function login_turn_request(char_name, proc) {
-    const holds = login_turn.holder && login_turn.holder.proc === proc;
-    if (holds || login_turn.queue.some((x) => x.proc === proc)) return;
+    const known = (x) => x.proc === proc;
+    if (login_turn.holders.some(known) || login_turn.queue.some(known)) return;
     login_turn.queue.push({ char_name, proc });
     login_turn_grant_next();
   }
 
   function login_turn_release(proc, reason) {
-    const holder = login_turn.holder;
-    if (!holder || holder.proc !== proc) return;
+    const holder = login_turn.holders.find((x) => x.proc === proc);
+    if (!holder) return;
     clearTimeout(holder.timer);
-    login_turn.holder = null;
+    login_turn.holders = login_turn.holders.filter((x) => x !== holder);
     const held_for = ((Date.now() - holder.granted_at) / 1000).toFixed(1);
     console.log(
       `login turn released by ${holder.char_name} after ${held_for}s (${reason})`,
