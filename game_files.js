@@ -190,48 +190,42 @@ async function obtain_latest_version() {
   const unique_script_paths = [...new Set(combined_script_paths)];
   validate_unique_basenames(unique_script_paths);
 
-  //the page can gain scripts without a version bump, and older downloads
-  //may predate the scraping, so an existing folder gets topped up too
+  if (is_new_version) await fs.mkdir(version_directory);
+  await fs.writeFile(
+    locate_manifest(version),
+    JSON.stringify(latest_manifest, null, 2),
+  );
+
   const missing_script_paths = [];
   for (const script_path of unique_script_paths) {
-    if (
-      is_new_version ||
-      !(await file_exists(locate_game_file(script_path, version)))
-    ) {
+    if (!(await file_exists(locate_game_file(script_path, version)))) {
       missing_script_paths.push(script_path);
     }
   }
   if (missing_script_paths.length == 0) {
     console.log(`version ${version} is already downloaded`);
-  } else {
-    if (is_new_version) {
-      console.log(`downloading version ${version}`);
-    } else {
-      console.log(
-        `version ${version} is missing ${missing_script_paths.length} files, downloading them`,
-      );
-    }
-    console.debug("downloading files:\n%s", missing_script_paths);
-    try {
-      if (is_new_version) await fs.mkdir(version_directory);
-      const download_tasks = missing_script_paths.map((script_path) =>
-        download_file(
-          base_url + script_path,
-          locate_game_file(script_path, version),
-        ),
-      );
-      await Promise.all(download_tasks);
-    } catch (e) {
-      //a folder that was already there is still usable, leave it be
-      if (is_new_version)
-        await fs.rmdir(version_directory, { recursive: true });
-      throw e;
-    }
+    return version;
   }
-  await fs.writeFile(
-    locate_manifest(version),
-    JSON.stringify(latest_manifest, null, 2),
+
+  if (is_new_version) {
+    console.log(`downloading new version ${version}`);
+  } else {
+    console.log(
+      `version ${version} is missing ${missing_script_paths.length} files, downloading them`,
+    );
+  }
+  console.debug("downloading files:\n%s", missing_script_paths);
+
+  const download_tasks = missing_script_paths.map((script_path) =>
+    download_file(
+      base_url + script_path,
+      locate_game_file(script_path, version),
+    ),
   );
+  // Finish downloads, if any failed fail this func call
+  await Promise.allSettled(download_tasks);
+  await Promise.all(download_tasks);
+
   return version;
 }
 module.exports = {
