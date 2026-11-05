@@ -9,18 +9,9 @@ const fetch = (...args) =>
 const path = require("path");
 const { console } = require("./src/LogUtils");
 
-function get_runner_files() {
-  return [
-    "/js/old_common_functions.js",
-    "/js/common_functions.js",
-    "/js/runner_functions.js",
-    "/js/runner_compat.js",
-  ];
-}
-
 //vendor scripts the game page loads that we leave out: the node context
 //provides its own jquery/io/bowser, the rest only matter with a real browser
-const skipped_scripts = [
+const SKIPPED_SCRIPT_PATTERNS = [
   /^\/js\/pixi-/,
   /^\/js\/socket\.io\//,
   /^\/js\/jquery\//,
@@ -31,7 +22,7 @@ const skipped_scripts = [
 ];
 //vendor scripts the game code needs to exist, swapped for the no-op versions
 //the server hosts
-const substituted_scripts = [
+const SCRIPT_SUBSTITUTIONS = [
   [/^\/js\/pixi\/[^/]+\/pixi\.min\.js$/, "/js/pixi/fake/pixi.min.js"],
   [
     /^\/js\/codemirror\/[^/]+\/codemirror\.js$/,
@@ -39,16 +30,55 @@ const substituted_scripts = [
   ],
 ];
 
+//runner scripts are still selected explicitly, in evaluation order
+const LEGACY_RUNNER_SCRIPT_PATHS = [
+  "/js/old_common_functions.js",
+  "/js/common_functions.js",
+  "/js/runner_functions.js",
+  "/js/runner_compat.js",
+];
+
+//game scripts for versions downloaded before manifests existed
+const LEGACY_GAME_SCRIPT_PATHS = [
+  "/js/pixi/fake/pixi.min.js",
+  "/js/libraries/combined.js",
+  "/js/codemirror/fake/codemirror.js",
+  "/js/old_common_functions.js",
+  "/js/common_functions.js",
+  "/js/functions.js",
+  "/js/generated_zones.js",
+  "/js/entity_animations.js",
+  "/js/npc_obstruction_hint.js",
+  "/js/tavern_poker.js",
+  "/js/tavern_slots.js",
+  "/js/tavern_wheel.js",
+  "/js/merrit_stand_notice.js",
+  "/js/phrases.js",
+  "/phrases/en.js",
+  "/js/game.js",
+  "/js/html.js",
+  "/js/payments.js",
+  "/js/keyboard.js",
+  "/data.js",
+];
+
+function get_runner_files() {
+  return LEGACY_RUNNER_SCRIPT_PATHS;
+}
+
 //the script tags of the game page, in page order
 function parse_game_files(html) {
   const script_src_pattern = /<script[^>]*\ssrc="([^"]+)"/g;
   const result = [];
   for (const match of html.matchAll(script_src_pattern)) {
     let src = match[1].split("?")[0];
-    if (!src.startsWith("/") || skipped_scripts.some((x) => x.test(src))) {
+    if (
+      !src.startsWith("/") ||
+      SKIPPED_SCRIPT_PATTERNS.some((x) => x.test(src))
+    ) {
       continue;
     }
-    for (const [pattern, replacement] of substituted_scripts) {
+    for (const [pattern, replacement] of SCRIPT_SUBSTITUTIONS) {
       if (pattern.test(src)) src = replacement;
     }
     if (!result.includes(src)) result.push(src);
@@ -72,29 +102,7 @@ function get_game_files(version) {
   } catch (e) {
     if (e.code != "ENOENT") throw e;
   }
-  //versions downloaded before manifests existed
-  return [
-    "/js/pixi/fake/pixi.min.js",
-    "/js/libraries/combined.js",
-    "/js/codemirror/fake/codemirror.js",
-    "/js/old_common_functions.js",
-    "/js/common_functions.js",
-    "/js/functions.js",
-    "/js/generated_zones.js",
-    "/js/entity_animations.js",
-    "/js/npc_obstruction_hint.js",
-    "/js/tavern_poker.js",
-    "/js/tavern_slots.js",
-    "/js/tavern_wheel.js",
-    "/js/merrit_stand_notice.js",
-    "/js/phrases.js",
-    "/phrases/en.js",
-    "/js/game.js",
-    "/js/html.js",
-    "/js/payments.js",
-    "/js/keyboard.js",
-    "/data.js",
-  ];
+  return LEGACY_GAME_SCRIPT_PATHS;
 }
 
 async function cull_versions(exclusions) {
