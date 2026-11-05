@@ -1,71 +1,113 @@
 const base_url = "https://adventure.land";
 const fs = require("fs").promises;
-const { createWriteStream } = require("fs");
+const { createWriteStream, readFileSync } = require("fs");
 const { pipeline } = require("stream");
 const { promisify } = require("util");
 const streamPipeline = promisify(pipeline);
 const fetch = (...args) =>
   import("node-fetch").then(({ default: fetch }) => fetch(...args));
-const path = require("path");
+const posix_path = require("path").posix;
 const { console } = require("./src/LogUtils");
 
+//the node context provides its own jquery/io/bowser
+const SKIPPED_SCRIPT_PATTERNS = [
+  /^\/js\/socket\.io\//,
+  /^\/js\/jquery\//,
+  /^\/js\/libraries\/(jquery|bowser)/,
+];
+
+//runner scripts are still selected explicitly, in evaluation order
+const LEGACY_RUNNER_SCRIPT_PATHS = [
+  "/js/old_common_functions.js",
+  "/js/common_functions.js",
+  "/js/runner_functions.js",
+  "/js/runner_compat.js",
+];
+
+//game scripts for versions downloaded before manifests existed
+const LEGACY_GAME_SCRIPT_PATHS = [
+  "/js/pixi/fake/pixi.min.js",
+  "/js/libraries/combined.js",
+  "/js/codemirror/fake/codemirror.js",
+  "/js/old_common_functions.js",
+  "/js/common_functions.js",
+  "/js/functions.js",
+  "/js/generated_zones.js",
+  "/js/entity_animations.js",
+  "/js/npc_obstruction_hint.js",
+  "/js/tavern_poker.js",
+  "/js/tavern_slots.js",
+  "/js/tavern_wheel.js",
+  "/js/merrit_stand_notice.js",
+  "/js/phrases.js",
+  "/phrases/en.js",
+  "/js/game.js",
+  "/js/html.js",
+  "/js/payments.js",
+  "/js/keyboard.js",
+  "/data.js",
+];
+
 function get_runner_files() {
-  return [
-    "/js/old_common_functions.js",
-    "/js/common_functions.js",
-    "/js/runner_functions.js",
-    "/js/runner_compat.js",
-  ];
+  return LEGACY_RUNNER_SCRIPT_PATHS;
 }
 
-function get_game_files() {
-  return [
-    "/js/pixi/fake/pixi.min.js",
-    "/js/libraries/combined.js",
-    "/js/codemirror/fake/codemirror.js",
-    "/js/old_common_functions.js",
-    "/js/common_functions.js",
-    "/js/functions.js",
-    "/js/generated_zones.js",
-    "/js/entity_animations.js",
-    "/js/npc_obstruction_hint.js",
-    "/js/tavern_poker.js",
-    "/js/tavern_slots.js",
-    "/js/tavern_wheel.js",
-    "/js/merrit_stand_notice.js",
-    "/js/phrases.js",
-    "/phrases/en.js",
-    "/js/game.js",
-    "/js/html.js",
-    "/js/payments.js",
-    "/js/keyboard.js",
-    "/data.js",
-  ];
+//the script tags of the game page, in page order
+function parse_game_files(html) {
+  const script_src_pattern = /<script[^>]*\ssrc="([^"]+)"/g;
+  const result = [];
+  for (const match of html.matchAll(script_src_pattern)) {
+    const script_path = match[1].split("?")[0];
+    if (
+      !script_path.startsWith("/") ||
+      SKIPPED_SCRIPT_PATTERNS.some((x) => x.test(script_path))
+    ) {
+      continue;
+    }
+    if (!result.includes(script_path)) result.push(script_path);
+  }
+  return result;
 }
 
-async function cull_versions(exclusions) {
-  const all_versions = await available_versions();
-  const target_culls = all_versions.filter(
-    (x, i) => i >= 2 && !exclusions.includes(x),
+function get_game_files(version) {
+  try {
+    const current_manifest = JSON.parse(
+      readFileSync(locate_manifest(version), "utf8"),
+    );
+    return current_manifest.game_files;
+  } catch (e) {
+    if (e.code != "ENOENT") throw e;
+  }
+  return LEGACY_GAME_SCRIPT_PATHS;
+}
+
+async function cull_versions(protected_versions) {
+  const sorted_numeric_versions = await available_versions();
+  const newest_versions = sorted_numeric_versions.slice(0, 2);
+  const retained_versions = new Set([
+    ...newest_versions,
+    ...protected_versions,
+  ]);
+  const versions_to_cull = sorted_numeric_versions.filter(
+    (version) => !retained_versions.has(version),
   );
-  for (let cull of target_culls) {
+  for (const version of versions_to_cull) {
     try {
-      console.log("culling version " + cull);
-      await fs.rmdir("./game_files/" + cull, { recursive: true });
+      console.log("culling version " + version);
+      await fs.rmdir("./game_files/" + version, { recursive: true });
     } catch (e) {
-      console.warn("failed to cull version " + cull, e);
+      console.warn("failed to cull version " + version, e);
     }
   }
 }
 
 async function available_versions() {
+  const only_digits = /^\d+$/;
   return (await fs.readdir("./game_files", { withFileTypes: true }))
     .filter((dirent) => dirent.isDirectory())
     .map((dirent) => dirent.name)
-    .filter((x) => x.match(/^\d+$/))
-    .map((x) => parseInt(x))
-    .sort()
-    .reverse();
+    .filter((version) => only_digits.test(version))
+    .sort((a, b) => Number(b) - Number(a));
 }
 
 async function download_file(url, file_p) {
@@ -75,55 +117,121 @@ async function download_file(url, file_p) {
     throw new Error(`failed to download ${url}: ${response.statusText}`);
   }
 
-  return await streamPipeline(response.body, createWriteStream(file_p));
+  //write aside and rename, so a file only exists once it is complete
+  await streamPipeline(response.body, createWriteStream(file_p + ".part"));
+  await fs.rename(file_p + ".part", file_p);
 }
 
-async function get_latest_version() {
-  const raw = await fetch(base_url);
-  if (!raw.ok) {
-    throw new Error(`failed to check version: ${raw.statusText}`);
+async function file_exists(file_p) {
+  try {
+    await fs.access(file_p);
+    return true;
+  } catch (e) {
+    return false;
   }
-  const html = await raw.text();
-  const match = /game\.js\?v=([0-9]+)"/.exec(html);
-  if (!match) {
+}
+
+function parse_game_version(html) {
+  const version_match = /game\.js\?v=([0-9]+)"/.exec(html);
+  if (!version_match) {
     throw new Error(`malformed version response`);
   }
-  return parseInt(match[1]);
+  return version_match[1];
+}
+
+async function get_latest_manifest() {
+  //match the runtime flags in html_vars.js
+  const response = await fetch(
+    base_url + "/?is_bot=1&no_graphics=1&no_html=bot",
+  );
+  if (!response.ok) {
+    throw new Error(`failed to check version: ${response.statusText}`);
+  }
+  const html = await response.text();
+  return {
+    version: parse_game_version(html),
+    game_files: parse_game_files(html),
+  };
 }
 
 function locate_game_file(resource, version) {
-  return `./game_files/${version}/${path.posix.basename(resource)}`;
+  return posix_path.join(
+    "./game_files",
+    version,
+    posix_path.basename(resource),
+  );
 }
 
-async function ensure_latest() {
-  const version = await get_latest_version();
-  if ((await available_versions()).includes(version)) {
-    console.log(`version ${version} is already downloaded`);
-  } else {
-    console.log(`downloading version ${version}`);
-    const fpath = "./game_files/" + version;
-    try {
-      await fs.mkdir(fpath);
-      const target_files = get_game_files()
-        .concat(get_runner_files())
-        //remove duplicates
-        .filter(function (item, pos, self) {
-          return self.indexOf(item) == pos;
-        });
-      const tasks = target_files.map((itm) =>
-        download_file(base_url + itm, locate_game_file(itm, version)),
-      );
-      await Promise.all(tasks);
-    } catch (e) {
-      await fs.rmdir(fpath, { recursive: true });
-      throw e;
+function locate_manifest(version) {
+  return locate_game_file("manifest.json", version);
+}
+
+function validate_unique_basenames(script_paths) {
+  //game files are stored flat, see locate_game_file
+  const script_basenames = script_paths.map((script_path) =>
+    posix_path.basename(script_path),
+  );
+  const conflicting_basename = script_basenames.find(
+    (basename, index) => script_basenames.indexOf(basename) != index,
+  );
+  if (conflicting_basename) {
+    throw new Error(`game files share the file name ${conflicting_basename}`);
+  }
+}
+
+// Downloads files or reuses existing files
+async function obtain_latest_version() {
+  const latest_manifest = await get_latest_manifest();
+  const { version, game_files } = latest_manifest;
+  const version_directory = "./game_files/" + version;
+  const is_new_version = !(await available_versions()).includes(version);
+
+  const combined_script_paths = game_files.concat(get_runner_files());
+  const unique_script_paths = [...new Set(combined_script_paths)];
+  validate_unique_basenames(unique_script_paths);
+
+  if (is_new_version) await fs.mkdir(version_directory);
+  await fs.writeFile(
+    locate_manifest(version),
+    JSON.stringify(latest_manifest, null, 2),
+  );
+
+  const missing_script_paths = [];
+  for (const script_path of unique_script_paths) {
+    if (!(await file_exists(locate_game_file(script_path, version)))) {
+      missing_script_paths.push(script_path);
     }
   }
+  if (missing_script_paths.length == 0) {
+    console.log(`version ${version} is already downloaded`);
+    return version;
+  }
+
+  if (is_new_version) {
+    console.log(`downloading new version ${version}`);
+  } else {
+    console.log(
+      `version ${version} is missing ${missing_script_paths.length} files, downloading them`,
+    );
+  }
+  console.debug("downloading files:\n%s", missing_script_paths);
+
+  const download_tasks = missing_script_paths.map((script_path) =>
+    download_file(
+      base_url + script_path,
+      locate_game_file(script_path, version),
+    ),
+  );
+  // Finish downloads, if any failed fail this func call
+  await Promise.allSettled(download_tasks);
+  await Promise.all(download_tasks);
+
   return version;
 }
-exports.cull_versions = cull_versions;
-exports.available_versions = available_versions;
-exports.ensure_latest = ensure_latest;
-exports.locate_game_file = locate_game_file;
-exports.get_runner_files = get_runner_files;
-exports.get_game_files = get_game_files;
+module.exports = {
+  cull_versions,
+  obtain_latest_version,
+  locate_game_file,
+  get_runner_files,
+  get_game_files,
+};

@@ -93,7 +93,7 @@ function migrate_old_storage(path, localStorage) {
   localStorage.set("caracAL", "Yeah");
   sessionStorage.set("caracAL", "Yup");
 
-  const version = await game_files.ensure_latest();
+  const version = await game_files.obtain_latest_version();
 
   const cfg = require("../config");
   if (cfg.cull_versions) {
