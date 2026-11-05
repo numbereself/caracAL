@@ -83,12 +83,6 @@ function parse_game_files(html) {
     }
     if (!result.includes(src)) result.push(src);
   }
-  //game files are stored flat, see locate_game_file
-  const basenames = result.map((x) => posix_path.basename(x));
-  const clash = basenames.find((x, i) => basenames.indexOf(x) != i);
-  if (clash) {
-    throw new Error(`game files share the file name ${clash}`);
-  }
   return result;
 }
 
@@ -120,10 +114,11 @@ async function cull_versions(exclusions) {
 }
 
 async function available_versions() {
+  const only_digits = /^\d+$/;
   return (await fs.readdir("./game_files", { withFileTypes: true }))
     .filter((dirent) => dirent.isDirectory())
     .map((dirent) => dirent.name)
-    .filter((x) => x.match(/^\d+$/))
+    .filter((version) => only_digits.test(version))
     .sort((a, b) => Number(b) - Number(a));
 }
 
@@ -183,42 +178,57 @@ function locate_manifest(version) {
 async function ensure_latest() {
   const latest_manifest = await get_latest_manifest();
   const { version, game_files } = latest_manifest;
-  const fpath = "./game_files/" + version;
-  const is_new = !(await available_versions()).includes(version);
-  const target_files = game_files
-    .concat(get_runner_files())
-    //remove duplicates
-    .filter(function (item, pos, self) {
-      return self.indexOf(item) == pos;
-    });
+  const version_directory = "./game_files/" + version;
+  const is_new_version = !(await available_versions()).includes(version);
+
+  const combined_script_paths = game_files.concat(get_runner_files());
+  const unique_script_paths = [...new Set(combined_script_paths)];
+
+  //game files are stored flat, see locate_game_file
+  const script_basenames = unique_script_paths.map((script_path) =>
+    posix_path.basename(script_path),
+  );
+  const conflicting_basename = script_basenames.find(
+    (basename, index) => script_basenames.indexOf(basename) != index,
+  );
+  if (conflicting_basename) {
+    throw new Error(`game files share the file name ${conflicting_basename}`);
+  }
+
   //the page can gain scripts without a version bump, and older downloads
   //may predate the scraping, so an existing folder gets topped up too
-  const missing = [];
-  for (const itm of target_files) {
-    if (is_new || !(await file_exists(locate_game_file(itm, version)))) {
-      missing.push(itm);
+  const missing_script_paths = [];
+  for (const script_path of unique_script_paths) {
+    if (
+      is_new_version ||
+      !(await file_exists(locate_game_file(script_path, version)))
+    ) {
+      missing_script_paths.push(script_path);
     }
   }
-  if (missing.length == 0) {
+  if (missing_script_paths.length == 0) {
     console.log(`version ${version} is already downloaded`);
   } else {
-    if (is_new) {
+    if (is_new_version) {
       console.log(`downloading version ${version}`);
     } else {
       console.log(
-        `version ${version} is missing ${missing.length} files, downloading them`,
+        `version ${version} is missing ${missing_script_paths.length} files, downloading them`,
       );
     }
-    console.debug("downloading files:\n%s", missing);
+    console.debug("downloading files:\n%s", missing_script_paths);
     try {
-      if (is_new) await fs.mkdir(fpath);
-      const tasks = missing.map((itm) =>
-        download_file(base_url + itm, locate_game_file(itm, version)),
+      if (is_new_version) await fs.mkdir(version_directory);
+      const download_tasks = missing_script_paths.map((script_path) =>
+        download_file(
+          base_url + script_path,
+          locate_game_file(script_path, version),
+        ),
       );
-      await Promise.all(tasks);
+      await Promise.all(download_tasks);
     } catch (e) {
       //a folder that was already there is still usable, leave it be
-      if (is_new) await fs.rmdir(fpath, { recursive: true });
+      if (is_new_version) await fs.rmdir(version_directory, { recursive: true });
       throw e;
     }
   }
