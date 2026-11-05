@@ -84,7 +84,10 @@ function get_game_files(version) {
 async function cull_versions(protected_versions) {
   const sorted_numeric_versions = await available_versions();
   const newest_versions = sorted_numeric_versions.slice(0, 2);
-  const retained_versions = new Set([...newest_versions, ...protected_versions]);
+  const retained_versions = new Set([
+    ...newest_versions,
+    ...protected_versions,
+  ]);
   const versions_to_cull = sorted_numeric_versions.filter(
     (version) => !retained_versions.has(version),
   );
@@ -163,17 +166,9 @@ function locate_manifest(version) {
   return locate_game_file("manifest.json", version);
 }
 
-async function ensure_latest() {
-  const latest_manifest = await get_latest_manifest();
-  const { version, game_files } = latest_manifest;
-  const version_directory = "./game_files/" + version;
-  const is_new_version = !(await available_versions()).includes(version);
-
-  const combined_script_paths = game_files.concat(get_runner_files());
-  const unique_script_paths = [...new Set(combined_script_paths)];
-
+function validate_unique_basenames(script_paths) {
   //game files are stored flat, see locate_game_file
-  const script_basenames = unique_script_paths.map((script_path) =>
+  const script_basenames = script_paths.map((script_path) =>
     posix_path.basename(script_path),
   );
   const conflicting_basename = script_basenames.find(
@@ -182,6 +177,18 @@ async function ensure_latest() {
   if (conflicting_basename) {
     throw new Error(`game files share the file name ${conflicting_basename}`);
   }
+}
+
+// Downloads files or reuses existing files
+async function obtain_latest_version() {
+  const latest_manifest = await get_latest_manifest();
+  const { version, game_files } = latest_manifest;
+  const version_directory = "./game_files/" + version;
+  const is_new_version = !(await available_versions()).includes(version);
+
+  const combined_script_paths = game_files.concat(get_runner_files());
+  const unique_script_paths = [...new Set(combined_script_paths)];
+  validate_unique_basenames(unique_script_paths);
 
   //the page can gain scripts without a version bump, and older downloads
   //may predate the scraping, so an existing folder gets topped up too
@@ -229,7 +236,7 @@ async function ensure_latest() {
 }
 module.exports = {
   cull_versions,
-  ensure_latest,
+  obtain_latest_version,
   locate_game_file,
   get_runner_files,
   get_game_files,
