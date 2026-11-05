@@ -6,7 +6,7 @@ const { promisify } = require("util");
 const streamPipeline = promisify(pipeline);
 const fetch = (...args) =>
   import("node-fetch").then(({ default: fetch }) => fetch(...args));
-const path = require("path");
+const posix_path = require("path").posix;
 const { console } = require("./src/LogUtils");
 
 //vendor scripts the game page loads that we leave out: the node context
@@ -84,16 +84,12 @@ function parse_game_files(html) {
     if (!result.includes(src)) result.push(src);
   }
   //game files are stored flat, see locate_game_file
-  const basenames = result.map((x) => path.posix.basename(x));
+  const basenames = result.map((x) => posix_path.basename(x));
   const clash = basenames.find((x, i) => basenames.indexOf(x) != i);
   if (clash) {
     throw new Error(`game files share the file name ${clash}`);
   }
   return result;
-}
-
-function locate_manifest(version) {
-  return `./game_files/${version}/manifest.json`;
 }
 
 function get_game_files(version) {
@@ -128,9 +124,7 @@ async function available_versions() {
     .filter((dirent) => dirent.isDirectory())
     .map((dirent) => dirent.name)
     .filter((x) => x.match(/^\d+$/))
-    .map((x) => parseInt(x))
-    .sort()
-    .reverse();
+    .sort((a, b) => Number(b) - Number(a));
 }
 
 async function download_file(url, file_p) {
@@ -159,7 +153,7 @@ function parse_game_version(html) {
   if (!version_match) {
     throw new Error(`malformed version response`);
   }
-  return parseInt(version_match[1], 10);
+  return version_match[1];
 }
 
 async function get_latest_manifest() {
@@ -175,7 +169,15 @@ async function get_latest_manifest() {
 }
 
 function locate_game_file(resource, version) {
-  return `./game_files/${version}/${path.posix.basename(resource)}`;
+  return posix_path.join(
+    "./game_files",
+    version,
+    posix_path.basename(resource),
+  );
+}
+
+function locate_manifest(version) {
+  return locate_game_file("manifest.json", version);
 }
 
 async function ensure_latest() {
