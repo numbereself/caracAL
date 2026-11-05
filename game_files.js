@@ -57,14 +57,14 @@ function parse_game_files(html) {
   const script_src_pattern = /<script[^>]*\ssrc="([^"]+)"/g;
   const result = [];
   for (const match of html.matchAll(script_src_pattern)) {
-    const src = match[1].split("?")[0];
+    const script_path = match[1].split("?")[0];
     if (
-      !src.startsWith("/") ||
-      SKIPPED_SCRIPT_PATTERNS.some((x) => x.test(src))
+      !script_path.startsWith("/") ||
+      SKIPPED_SCRIPT_PATTERNS.some((x) => x.test(script_path))
     ) {
       continue;
     }
-    if (!result.includes(src)) result.push(src);
+    if (!result.includes(script_path)) result.push(script_path);
   }
   return result;
 }
@@ -81,17 +81,19 @@ function get_game_files(version) {
   return LEGACY_GAME_SCRIPT_PATHS;
 }
 
-async function cull_versions(exclusions) {
-  const all_versions = await available_versions();
-  const target_culls = all_versions.filter(
-    (x, i) => i >= 2 && !exclusions.includes(x),
+async function cull_versions(protected_versions) {
+  const sorted_numeric_versions = await available_versions();
+  const newest_versions = sorted_numeric_versions.slice(0, 2);
+  const retained_versions = new Set([...newest_versions, ...protected_versions]);
+  const versions_to_cull = sorted_numeric_versions.filter(
+    (version) => !retained_versions.has(version),
   );
-  for (let cull of target_culls) {
+  for (const version of versions_to_cull) {
     try {
-      console.log("culling version " + cull);
-      await fs.rmdir("./game_files/" + cull, { recursive: true });
+      console.log("culling version " + version);
+      await fs.rmdir("./game_files/" + version, { recursive: true });
     } catch (e) {
-      console.warn("failed to cull version " + cull, e);
+      console.warn("failed to cull version " + version, e);
     }
   }
 }
