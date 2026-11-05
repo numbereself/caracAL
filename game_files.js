@@ -98,7 +98,10 @@ function locate_manifest(version) {
 
 function get_game_files(version) {
   try {
-    return JSON.parse(readFileSync(locate_manifest(version), "utf8"));
+    const current_manifest = JSON.parse(
+      readFileSync(locate_manifest(version), "utf8"),
+    );
+    return current_manifest.game_files;
   } catch (e) {
     if (e.code != "ENOENT") throw e;
   }
@@ -151,17 +154,24 @@ async function file_exists(file_p) {
   }
 }
 
-async function get_latest() {
-  const raw = await fetch(base_url);
-  if (!raw.ok) {
-    throw new Error(`failed to check version: ${raw.statusText}`);
-  }
-  const html = await raw.text();
-  const match = /game\.js\?v=([0-9]+)"/.exec(html);
-  if (!match) {
+function parse_game_version(html) {
+  const version_match = /game\.js\?v=([0-9]+)"/.exec(html);
+  if (!version_match) {
     throw new Error(`malformed version response`);
   }
-  return { version: parseInt(match[1]), game_files: parse_game_files(html) };
+  return parseInt(version_match[1], 10);
+}
+
+async function get_latest_manifest() {
+  const response = await fetch(base_url);
+  if (!response.ok) {
+    throw new Error(`failed to check version: ${response.statusText}`);
+  }
+  const html = await response.text();
+  return {
+    version: parse_game_version(html),
+    game_files: parse_game_files(html),
+  };
 }
 
 function locate_game_file(resource, version) {
@@ -169,7 +179,8 @@ function locate_game_file(resource, version) {
 }
 
 async function ensure_latest() {
-  const { version, game_files } = await get_latest();
+  const latest_manifest = await get_latest_manifest();
+  const { version, game_files } = latest_manifest;
   const fpath = "./game_files/" + version;
   const is_new = !(await available_versions()).includes(version);
   const target_files = game_files
@@ -211,13 +222,12 @@ async function ensure_latest() {
   }
   await fs.writeFile(
     locate_manifest(version),
-    JSON.stringify(game_files, null, 2),
+    JSON.stringify(latest_manifest, null, 2),
   );
   return version;
 }
 module.exports = {
   cull_versions,
-  available_versions,
   ensure_latest,
   locate_game_file,
   get_runner_files,
