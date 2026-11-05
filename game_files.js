@@ -41,8 +41,9 @@ const substituted_scripts = [
 
 //the script tags of the game page, in page order
 function parse_game_files(html) {
+  const script_src_pattern = /<script[^>]*\ssrc="([^"]+)"/g;
   const result = [];
-  for (const match of html.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)) {
+  for (const match of html.matchAll(script_src_pattern)) {
     let src = match[1].split("?")[0];
     if (!src.startsWith("/") || skipped_scripts.some((x) => x.test(src))) {
       continue;
@@ -206,9 +207,11 @@ async function ensure_latest() {
   );
   return version;
 }
-exports.cull_versions = cull_versions;
-exports.available_versions = available_versions;
-exports.ensure_latest = ensure_latest;
-exports.locate_game_file = locate_game_file;
-exports.get_runner_files = get_runner_files;
-exports.get_game_files = get_game_files;
+module.exports = {
+  cull_versions,
+  available_versions,
+  ensure_latest,
+  locate_game_file,
+  get_runner_files,
+  get_game_files,
+};
