@@ -4,6 +4,15 @@ A Node.js client for [adventure.land](https://adventure.land/ "Adventure Land")
 
 ## Recent Versions
 
+### Manifest-based game file discovery
+
+#### 2026-11-05
+
+Game files are now discovered from Adventure Land's headless page and recorded in per-version manifests.
+
+- Download missing files in existing versions and preserve completed downloads for retries.
+- Keep support for older downloads without manifests.
+
 ### pnpm and Node.js 24
 
 #### 2026-10-18
