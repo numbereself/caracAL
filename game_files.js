@@ -9,25 +9,11 @@ const fetch = (...args) =>
 const posix_path = require("path").posix;
 const { console } = require("./src/LogUtils");
 
-//vendor scripts the game page loads that we leave out: the node context
-//provides its own jquery/io/bowser, the rest only matter with a real browser
+//the node context provides its own jquery/io/bowser
 const SKIPPED_SCRIPT_PATTERNS = [
-  /^\/js\/pixi-/,
   /^\/js\/socket\.io\//,
   /^\/js\/jquery\//,
-  /^\/js\/howler\//,
   /^\/js\/libraries\/(jquery|bowser)/,
-  /^\/js\/codemirror\/(?!.*\/codemirror\.js$)/,
-  /^\/js\/ios-drag-drop\.js$/,
-];
-//vendor scripts the game code needs to exist, swapped for the no-op versions
-//the server hosts
-const SCRIPT_SUBSTITUTIONS = [
-  [/^\/js\/pixi\/[^/]+\/pixi\.min\.js$/, "/js/pixi/fake/pixi.min.js"],
-  [
-    /^\/js\/codemirror\/[^/]+\/codemirror\.js$/,
-    "/js/codemirror/fake/codemirror.js",
-  ],
 ];
 
 //runner scripts are still selected explicitly, in evaluation order
@@ -71,15 +57,12 @@ function parse_game_files(html) {
   const script_src_pattern = /<script[^>]*\ssrc="([^"]+)"/g;
   const result = [];
   for (const match of html.matchAll(script_src_pattern)) {
-    let src = match[1].split("?")[0];
+    const src = match[1].split("?")[0];
     if (
       !src.startsWith("/") ||
       SKIPPED_SCRIPT_PATTERNS.some((x) => x.test(src))
     ) {
       continue;
-    }
-    for (const [pattern, replacement] of SCRIPT_SUBSTITUTIONS) {
-      if (pattern.test(src)) src = replacement;
     }
     if (!result.includes(src)) result.push(src);
   }
@@ -152,7 +135,10 @@ function parse_game_version(html) {
 }
 
 async function get_latest_manifest() {
-  const response = await fetch(base_url);
+  //match the runtime flags in html_vars.js
+  const response = await fetch(
+    base_url + "/?is_bot=1&no_graphics=1&no_html=bot",
+  );
   if (!response.ok) {
     throw new Error(`failed to check version: ${response.statusText}`);
   }
@@ -228,7 +214,8 @@ async function ensure_latest() {
       await Promise.all(download_tasks);
     } catch (e) {
       //a folder that was already there is still usable, leave it be
-      if (is_new_version) await fs.rmdir(version_directory, { recursive: true });
+      if (is_new_version)
+        await fs.rmdir(version_directory, { recursive: true });
       throw e;
     }
   }
