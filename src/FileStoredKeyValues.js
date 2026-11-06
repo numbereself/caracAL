@@ -89,14 +89,26 @@ class FileStoredKeyValues {
     try {
       fs.writeFileSync(fd, k_v_list.join(""), { encoding: "utf8" });
       fs.fsyncSync(fd);
-      fs.renameSync(this.#replacer_path, this.#main_path);
+
+      // Close old handle only long enough for the Windows rename
+      const old_handle = this.#handle;
+      fs.closeSync(old_handle);
+
+      try {
+        fs.renameSync(this.#replacer_path, this.#main_path);
+        this.#handle = fd;
+      } catch (renameErr) {
+        // Rename failed — restore a usable handle on the original file
+        this.#handle = fs.openSync(
+          this.#main_path,
+          fs.constants.O_RDWR | fs.constants.O_CREAT | fs.constants.O_APPEND,
+        );
+        throw renameErr;
+      }
     } catch (err) {
-      fs.closeSync(fd);
+      try { fs.closeSync(fd); } catch {}
       throw err;
     }
-    const old_handle = this.#handle;
-    this.#handle = fd;
-    fs.closeSync(old_handle);
   }
 
   close() {
