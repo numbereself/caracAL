@@ -72,9 +72,7 @@ class FileStoredKeyValues {
     }
   }
 
-  compact() {
-    // Write and sync a replacement before renaming it over the original.
-    // Keep the original handle usable if preparing or renaming fails.
+  #createCompactedReplacement() {
     const k_v_list = [];
     for (let [key, value] of this.#backend.entries()) {
       k_v_list.push(JSON.stringify({ [key]: value }) + "\n");
@@ -89,14 +87,33 @@ class FileStoredKeyValues {
     try {
       fs.writeFileSync(fd, k_v_list.join(""), { encoding: "utf8" });
       fs.fsyncSync(fd);
-      fs.renameSync(this.#replacer_path, this.#main_path);
     } catch (err) {
       fs.closeSync(fd);
       throw err;
     }
+    return fd;
+  }
+
+  compact() {
+    const fd = this.#createCompactedReplacement();
+    try {
+      fs.unlinkSync(this.#main_path);
+    } catch (err) {
+      fs.closeSync(fd);
+      throw err;
+    }
+    // After unlink succeeds, retain the replacement handle if promotion fails.
     const old_handle = this.#handle;
     this.#handle = fd;
-    fs.closeSync(old_handle);
+    try {
+      fs.closeSync(old_handle);
+      fs.renameSync(this.#replacer_path, this.#main_path);
+    } catch (err) {
+      // If something goes wrong here future compacts wont work
+      // So we stop compacting altogether
+      clearInterval(this.#compactionTimer);
+      throw err;
+    }
   }
 
   close() {
