@@ -4,6 +4,10 @@ A Node.js client for [adventure.land](https://adventure.land/ "Adventure Land")
 
 ## Recent Versions
 
+#### 2026-11-07
+
+Fix localStorage compaction failures on Windows.
+
 ### Manifest-based game file discovery
 
 #### 2026-11-05

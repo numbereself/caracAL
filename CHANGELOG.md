@@ -4,6 +4,10 @@ Here you can review the historic development of caracAL.
 
 I do not bundle releases but with the timestamp you can usually find the relevant git commit.
 
+#### 2026-11-07
+
+Fix localStorage compaction failures on Windows.
+
 ### Manifest-based game file discovery
 
 #### 2026-11-05
